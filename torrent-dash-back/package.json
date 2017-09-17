@@ -1,0 +1,20 @@
+{
+  "name": "torrent-dash-back",
+  "version": "1.0.0",
+  "main": "index.js",
+  "author": "segovia",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.15.4",
+    "glob": "^7.1.2",
+    "opensubtitles-api": "^4.0.0"
+  },
+  "scripts": {
+    "start": "node index.js",
+    "watch": "nodemon index.js",
+    "debug": "nodemon --inspect-brk=9229 index.js"
+  },
+  "devDependencies": {
+    "eslint": "^4.7.0"
+  }
+}
