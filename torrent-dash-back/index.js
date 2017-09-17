@@ -1,8 +1,9 @@
 const express = require("express");
 const MediaFiles = require("./media_files");
-const mediaFiles = new MediaFiles();
 const app = express();
 const port = 4000;
+
+const mediaFiles = new MediaFiles(process.argv[2]);
 
 app.get("/", function (req, res) {
     res.send("Hello World!");

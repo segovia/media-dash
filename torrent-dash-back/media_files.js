@@ -1,12 +1,15 @@
 const {promisify} = require("util");
 const glob = promisify(require("glob"));
 
-const mediaDir = "/media/gustavo/OS/Users/gustavo/workspace/torrent-dash/torrent-dash-back/test/Media";
 
 module.exports = class MediaFiles {
-
+    
+    constructor(mediaDir) {
+        this.mediaDir = mediaDir;
+        console.log("Media directory: " + this.mediaDir);
+    }
     async getFileListing() {
-        return glob(mediaDir + "/**/*", {nodir: true})
-            .then(files => files.filter(s => !s.endsWith(".srt")).map(s => s.substring(mediaDir.length + 1)));
+        return glob(this.mediaDir + "/**/*", {nodir: true})
+            .then(files => files.filter(s => !s.endsWith(".srt")).map(s => s.substring(this.mediaDir.length + 1)));
     }
 };
