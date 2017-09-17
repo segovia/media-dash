@@ -5,6 +5,7 @@
   "author": "segovia",
   "license": "MIT",
   "dependencies": {
+    "compression": "^1.7.0",
     "express": "^4.15.4",
     "fs-extra": "^4.0.2",
     "glob": "^7.1.2",

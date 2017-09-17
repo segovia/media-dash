@@ -1,7 +1,9 @@
+const compression = require("compression");
 const express = require("express");
 const Cache = require("./cache");
 const MediaFiles = require("./media_files");
 const app = express();
+app.use(compression());
 const port = 4000;
 
 const cache = new Cache();
