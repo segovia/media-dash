@@ -1,16 +1,23 @@
 const express = require("express");
+const Cache = require("./cache");
 const MediaFiles = require("./media_files");
 const app = express();
 const port = 4000;
 
+const cache = new Cache();
 const mediaFiles = new MediaFiles(process.argv[2]);
+
+// init (should be sync)
+cache.registerCall(mediaFiles.getFileListing.name, () => mediaFiles.getFileListing());
+cache.init();
+
 
 app.get("/", function (req, res) {
     res.send("Hello World!");
 });
 
-app.get("/file-list", async (req, res) => {
-    res.send(await mediaFiles.getFileListing());
+app.get("/file-listing", async (req, res) => {
+    res.send(await cache.call(mediaFiles.getFileListing));
 });
 
 app.listen(port, function () {

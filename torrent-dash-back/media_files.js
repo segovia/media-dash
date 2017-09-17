@@ -9,7 +9,10 @@ module.exports = class MediaFiles {
         console.log("Media directory: " + this.mediaDir);
     }
     async getFileListing() {
-        return glob(this.mediaDir + "/**/*", {nodir: true})
-            .then(files => files.filter(s => !s.endsWith(".srt")).map(s => s.substring(this.mediaDir.length + 1)));
+        console.log("MediaFiles - INFO: Scanning file listing");
+        const files = await glob(this.mediaDir + "/**/*", {nodir: true});
+        console.log("MediaFiles - INFO: Files scanned");
+        // filter out unneeded files
+        return files.filter(s => !s.endsWith(".srt")).map(s => s.substring(this.mediaDir.length + 1));
     }
 };
