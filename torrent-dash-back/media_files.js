@@ -12,7 +12,7 @@ module.exports = class MediaFiles {
         console.log("MediaFiles - INFO: Scanning file listing");
         const files = await glob(this.mediaDir + "/**/*", { nodir: true });
         console.log("MediaFiles - INFO: Files scanned");
-        const filteredFiles = files.filter(s => !s.endsWith(".srt")).map(s => s.substring(this.mediaDir.length));
+        const filteredFiles = files.filter(s => this._hasMovieExtension(s)).map(s => s.substring(this.mediaDir.length));
         return this._toTree(filteredFiles);
     }
 
@@ -32,6 +32,11 @@ module.exports = class MediaFiles {
         }
         const folder = parent.findOrCreateChild(token);
         this._toTreeRecursive(filePath, idx + 1, folder);
+    }
+
+    _hasMovieExtension(s) {
+        const ext = s.substr(-4).toLowerCase();
+        return ext === ".mp4" || ext === ".mvk" || ext === ".avi";
     }
 };
 
