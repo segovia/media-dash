@@ -10,10 +10,11 @@ module.exports = class MediaFiles {
     }
     async getFileListing() {
         console.log("MediaFiles - INFO: Scanning file listing");
-        const files = await glob(this.mediaDir + "/**/*", { nodir: true });
+        const files = await glob(
+            this.mediaDir + "/@(TV Shows|Movies)/**/!(*.srt|*.sub|*.idx|*.jpg|*.smi|*.nfo)",
+            { nodir: true });
         console.log("MediaFiles - INFO: Files scanned");
-        const filteredFiles = files.filter(s => this._hasMovieExtension(s)).map(s => s.substring(this.mediaDir.length));
-        return this._toTree(filteredFiles);
+        return this._toTree(files.map(s => s.substring(this.mediaDir.length)));
     }
 
     _toTree(fileList) {
@@ -32,11 +33,6 @@ module.exports = class MediaFiles {
         }
         const folder = parent.findOrCreateChild(token);
         this._toTreeRecursive(filePath, idx + 1, folder);
-    }
-
-    _hasMovieExtension(s) {
-        const ext = s.substr(-4).toLowerCase();
-        return ext === ".mp4" || ext === ".mvk" || ext === ".avi";
     }
 };
 

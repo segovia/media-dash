@@ -9,7 +9,6 @@ const port = 4000;
 const cache = new Cache();
 const mediaFiles = new MediaFiles(process.argv[2]);
 
-// init (should be sync)
 cache.registerCall(mediaFiles.getFileListing.name, () => mediaFiles.getFileListing());
 cache.init();
 
