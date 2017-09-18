@@ -38,7 +38,6 @@ module.exports = class MediaFiles {
 class File {
     constructor(name) {
         this.name = name;
-        this.type = "FILE";
     }
 }
 
