@@ -1,0 +1,24 @@
+{
+  "name": "media-dash-back",
+  "version": "1.0.0",
+  "main": "index.js",
+  "author": "segovia",
+  "license": "MIT",
+  "dependencies": {
+    "compression": "^1.7.0",
+    "express": "^4.15.4",
+    "fs-extra": "^4.0.2",
+    "glob": "^7.1.2",
+    "opensubtitles-api": "^4.0.0",
+    "request": "^2.82.0",
+    "request-promise-native": "^1.0.4"
+  },
+  "scripts": {
+    "start": "node index.js /home/gustavo/workspace/media-dash-test-data",
+    "watch": "nodemon index.js /home/gustavo/workspace/media-dash-test-data",
+    "debug": "nodemon --inspect-brk=9229 index.js /home/gustavo/workspace/media-dash-test-data"
+  },
+  "devDependencies": {
+    "eslint": "^4.7.0"
+  }
+}

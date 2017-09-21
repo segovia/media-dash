@@ -4,17 +4,18 @@ const glob = promisify(require("glob"));
 
 module.exports = class MediaFiles {
 
-    constructor(mediaDir) {
-        this.mediaDir = mediaDir;
-        console.log("Media directory: " + this.mediaDir);
+    constructor(ct) {
+        ct.mediaFiles = this;
+        this.ct = ct;
     }
+
     async getFileListing() {
         console.log("MediaFiles - INFO: Scanning file listing");
         const files = await glob(
-            this.mediaDir + "/@(TV Shows|Movies)/**/!(*.srt|*.sub|*.idx|*.jpg|*.smi|*.nfo)",
+            this.ct.props.mediaDir + "/@(TV Shows|Movies)/**/!(*.srt|*.sub|*.idx|*.jpg|*.smi|*.nfo)",
             { nodir: true });
-        console.log("MediaFiles - INFO: Files scanned");
-        return this._toTree(files.map(s => s.substring(this.mediaDir.length)));
+        console.log("MediaFiles - INFO: Files scanned, " + files.length + " files found");
+        return this._toTree(files.map(s => s.substring(this.ct.props.mediaDir.length)));
     }
 
     _toTree(fileList) {
