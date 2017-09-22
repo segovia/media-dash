@@ -1,4 +1,4 @@
 module.exports = {
-    TV: "tv",
-    MOVIE: "movie"
+    TV: "TV Shows",
+    MOVIE: "Movies"
 };

@@ -1,5 +1,7 @@
 const { promisify } = require("util");
 const glob = promisify(require("glob"));
+const MEDIA_TYPE = require("./media_type")
+
 
 
 module.exports = class MediaFiles {
@@ -11,17 +13,18 @@ module.exports = class MediaFiles {
 
     async getFileListing() {
         console.log("MediaFiles - INFO: Scanning file listing");
+        const start = new Date();
         const files = await glob(
-            this.ct.props.mediaDir + "/@(TV Shows|Movies)/**/!(*.srt|*.sub|*.idx|*.jpg|*.smi|*.nfo)",
+            this.ct.props.mediaDir + `/@(${MEDIA_TYPE.TV}|${MEDIA_TYPE.MOVIE})/**/!(*.srt|*.sub|*.idx|*.jpg|*.smi|*.nfo)`,
             { nodir: true });
-        console.log("MediaFiles - INFO: Files scanned, " + files.length + " files found");
+        console.log(`MediaFiles - INFO: Files scanned, ${files.length} files found in ${new Date() - start}ms`);
         return this._toTree(files.map(s => s.substring(this.ct.props.mediaDir.length)));
     }
 
     _toTree(fileList) {
-        const root = new Folder("Media");
+        const root = new Folder();
         fileList.forEach(file => this._toTreeRecursive(file, file.charAt(0) === "/" ? 1 : 0, root));
-        return root;
+        return root.children;
     }
 
     _toTreeRecursive(filePath, curIndex, parent) {
@@ -37,26 +40,19 @@ module.exports = class MediaFiles {
     }
 };
 
-class File {
-    constructor(name) {
-        this.name = name;
-    }
-}
-
 class Folder {
-    constructor(name) {
-        this.name = name;
+    constructor() {
         this.type = "FOLDER";
-        this.children = [];
+        this.children = {};
     }
     addFile(name) {
-        this.children.push(new File(name));
+        this.children[name] = {};
     }
     findOrCreateChild(name) {
-        let child = this.children.find(f => f.name === name && f.type === this.type);
+        let child = this.children[name];
         if (!child) {
-            child = new Folder(name);
-            this.children.push(child);
+            child = new Folder();
+            this.children[name] = child;
         }
         return child;
     }

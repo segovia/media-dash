@@ -17,8 +17,7 @@ const services = [
     new ExtMediaInfo(ct),
     new Media(ct)
 ];
-services.forEach(async s => s.init && await s.init());
-
+services.reduce((p, s) => p.then(() => s.init && s.init()), Promise.resolve());
 
 app.get("/media-listing", async (req, res) => {
     res.send(ct.media.getMediaListing());

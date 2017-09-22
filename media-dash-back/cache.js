@@ -25,18 +25,25 @@ module.exports = class Cache {
         }
     }
 
-    async loadCache(filename) {
+    async readCache(filename) {
         try {
             const result = await fse.readJson(`${mediaDashDir}/${filename}`, "utf8");
-            console.log(`Cache INFO: Read cache for ${filename}`);
             return result;
         } catch (e) {
             return null;
         }
     }
 
+    async readOrLoadCache(cacheKey, contentLoad) {
+        let data = await this.readCache(cacheKey);
+        if (data) return data;
+        data = await contentLoad();
+        await this.persistCache(cacheKey, data);
+        return data;
+    }
+
     async persistCache(filename, obj) {
         await fse.writeJson(`${mediaDashDir}/${filename}`, obj, { encoding: "utf-8" });
-        console.log("Cache INFO: Cache file written");
+        console.log(`Cache INFO: Cache file '${filename}' written`);
     }
 };

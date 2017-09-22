@@ -10,42 +10,57 @@ module.exports = class ExtMediaInfo {
         ct.extMediaInfo = this;
     }
 
-    async getMovieImdbId(filename) {
+
+    async getImdbId(title, mediaType) {
+        if (mediaType === MEDIA_TYPE.MOVIE) return await this.getMovieImdbId(title);
+        return await this.getTVShowImdbId(title);
+    }
+
+    async getMovieImdbId(name) {
         try {
-            const searchResult = await this._searchMovie(filename);
+            const searchResult = await this._searchMovie(name);
             var tmdbId = searchResult.results[0].id;
             const movieInfo = await this._getMovieInfo(tmdbId);
             return movieInfo.imdb_id;
         } catch (e) {
-            console.log(`Error code received for ${filename}: ${e}`);
+            console.log(`Error code received for ${name}: ${e}`);
+            return null;
+        }
+    }
+    
+    async _searchMovie(name) {
+        const searchMovieUrl = `${serviceUrl}/search/movie?api_key=${apiKey}`;
+        const movie = this._separateMovieNameAndYear(name);
+        const reqUrl = `${searchMovieUrl}&query=${encodeURIComponent(movie.name)}&year=${movie.year}`;
+        return JSON.parse(await request(reqUrl));
+    }
+    
+    async _getMovieInfo(tmdbId) {
+        return JSON.parse(await request(`${serviceUrl}/movie/${tmdbId}?api_key=${apiKey}`));
+    }
+    
+    _separateMovieNameAndYear(name) {
+        return { name: name.slice(0, name.length - 7), year: name.slice(-5, -1) };
+    }
+
+    async getTVShowImdbId(name) {
+        try {
+            const searchResult = await this._searchTVShow(name);
+            var tmdbId = searchResult.results[0].id;
+            const info = await this._getTVShowInfo(tmdbId);
+            return info.imdb_id;
+        } catch (e) {
+            console.log(`Error code received for ${name}: ${e}`);
             return null;
         }
     }
 
-    // _getInfo(fileName, type) {
-    //     switch (type) {
-    //         case MEDIA_TYPE.MOVIE:
-    //             return this._getMovieInfo(fileName);
-    //         case MEDIA_TYPE.TV:
-    //             console.log("tv");
-    //             break;
-    //     }
-    //     throw "Unknown media type: " + type;
-    // }
-
-    _separateMovieNameAndYear(fileName) {
-        return { name: fileName.slice(0, fileName.length - 7), year: fileName.slice(-5, -1) };
-    }
-
-    async _searchMovie(fileName) {
-        const searchMovieUrl = `${serviceUrl}/search/movie?api_key=${apiKey}`;
-        const movie = this._separateMovieNameAndYear(fileName);
-        const nameEncoded = encodeURIComponent(movie.name);
-        const reqUrl = `${searchMovieUrl}&query=${nameEncoded}&year=${movie.year}`;
+    async _searchTVShow(name) {
+        const reqUrl = `${serviceUrl}/search/tv?api_key=${apiKey}&query=${encodeURIComponent(name)}`;
         return JSON.parse(await request(reqUrl));
     }
 
-    async _getMovieInfo(tmdbId) {
-        return JSON.parse(await request(`${serviceUrl}/movie/${tmdbId}?api_key=${apiKey}`));
+    async _getTVShowInfo(tmdbId) {
+        return JSON.parse(await request(`${serviceUrl}/tv/${tmdbId}/external_ids?api_key=${apiKey}`));
     }
 };
