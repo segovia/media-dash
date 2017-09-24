@@ -1,0 +1,52 @@
+.App-header {
+    background-color: #222;
+    color: white;
+}
+
+body {
+    padding-top: 52px;
+}
+
+body, button.list-group-item {
+    background-color: #333333;
+    color: white;
+}
+.list-group {
+    margin-bottom: 0;
+}
+button.list-group-item {
+    background-color: #252526;
+    border-color: transparent;
+}
+button.list-group-item:hover {
+    background-color: #2A2D2E;
+    color: white;
+}
+button.list-group-item.active, button.list-group-item.active:hover {
+    background-image: none;
+    border-color: transparent;
+    background-color: #3F3F46;
+}
+button.list-group-item.active:focus {
+    background-image: none;
+    border-color: transparent;
+    background-color: #134971;
+}
+.navbar {
+    margin-bottom: 0;
+}
+.nav-tabs {
+    border: none;
+}
+.nav-tabs > li > a {
+    color: white;
+    border: none;
+}
+.nav-tabs > li > a:hover {
+    background-color: #7b7b7b;
+}
+.nav-tabs > li.active > a, .nav-tabs > li.active > a:hover, .nav-tabs > li.active > a:focus {
+    background-color: #252526;
+    color: white;
+    border: none;
+}

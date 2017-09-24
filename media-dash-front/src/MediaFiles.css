@@ -1,0 +1,79 @@
+.MediaFiles-container {
+    display: flex;
+}
+
+.MediaFiles-navigation {
+    flex: 0 0 400px;
+    background-color: #252526;
+}
+
+.MediaFiles-navigation .nav-tabs {
+    background-color: #333333;
+    border-right: 10px solid #2D2D2D;
+}
+
+.MediaFiles-content {
+    flex-grow: 1;
+    background-repeat: no-repeat;
+    background-size: cover;
+    padding-left: 30px;
+    background-color: #1E1E1E;
+    position: relative;
+    z-index: 1;
+}
+
+.MediaFiles-content:before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    opacity: .9;
+    z-index: -1;
+    background-color: #1E1E1E;
+}
+
+.MediaFiles-poster {
+    float: left;
+    width: 190px;
+    height: 283px;
+    margin-right: 20px;
+    padding: 5px;
+    background-color: #515151;
+}
+
+.MediaFiles-poster > img {
+    width: 100%;
+    height: 100%;
+}
+
+.MediaFiles-fileList {
+    height: calc(100vh - 91px);
+    overflow: scroll;
+    overflow-x: hidden;
+}
+
+.MediaFiles-fileList::-webkit-scrollbar {
+    width: 10px;  /* remove scrollbar space */
+    background: #2D2D2D;
+}
+.MediaFiles-fileList::-webkit-scrollbar-thumb {
+    background: #515151;
+}
+
+.MediaFiles-imdbId {
+    color:silver;
+    float: right;
+    display: none;
+    vertical-align: middle;
+}
+
+.MediaFiles-listItem:hover .MediaFiles-imdbId {
+    display: initial;
+}
+
+.MediaFiles-listItem.active .MediaFiles-imdbId {
+    display: initial;
+    color: white;
+}
