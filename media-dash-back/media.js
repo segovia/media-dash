@@ -51,7 +51,7 @@ module.exports = class Media {
     async _requestMissingImdbIds() {
         const titlesMissingImdbId = this._getTitlesWithoutImdbId();
         if (titlesMissingImdbId.length === 0) return;
-        // tmdb only allows 40 req per 20s, each imdb id needs 2 requests, so we can
+        // tmdb only allows 30 req per 10s, each imdb id needs 2 requests, so we can
         // only get 15 imdb ids per 10s.
         const batchSize = 15;
         const sleepTime = 10000; 

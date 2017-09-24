@@ -4,6 +4,7 @@ const Cache = require("./cache");
 const MediaFiles = require("./media_files");
 const ExtMediaInfo = require("./ext_media_info");
 const Media = require("./media");
+const MEDIA_TYPE = require("./media_type");
 const app = express();
 app.use(compression());
 const port = 4000;
@@ -19,8 +20,16 @@ const services = [
 ];
 services.reduce((p, s) => p.then(() => s.init && s.init()), Promise.resolve());
 
-app.get("/media-listing", async (req, res) => {
+app.get("/media-listing", (req, res) => {
     res.send(ct.media.getMediaListing());
+});
+
+app.get("/movie/:imdbId", async (req, res) => {
+    res.send(await ct.extMediaInfo.getInfo(req.params.imdbId, MEDIA_TYPE.MOVIE));
+});
+
+app.get("/tv/:imdbId", async (req, res) => {
+    res.send(await ct.extMediaInfo.getInfo(req.params.imdbId, MEDIA_TYPE.TV));
 });
 
 app.get("/", async (req, res) => {

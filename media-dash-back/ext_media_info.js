@@ -27,18 +27,32 @@ module.exports = class ExtMediaInfo {
             return null;
         }
     }
-    
+
     async _searchMovie(name) {
         const searchMovieUrl = `${serviceUrl}/search/movie?api_key=${apiKey}`;
         const movie = this._separateMovieNameAndYear(name);
         const reqUrl = `${searchMovieUrl}&query=${encodeURIComponent(movie.name)}&year=${movie.year}`;
         return JSON.parse(await request(reqUrl));
     }
-    
+
+    async getInfo(imdbId, mediaType) {
+        const response = JSON.parse(await request(`${serviceUrl}/find/${imdbId}?api_key=${apiKey}&external_source=imdb_id`));
+        const mediaInfo = response[mediaType === MEDIA_TYPE.TV ? "tv_results" : "movie_results"][0];
+        return {
+            title: mediaInfo[mediaType === MEDIA_TYPE.TV ? "name" : "title"],
+            posterPath: mediaInfo["poster_path"],
+            backdropPath: mediaInfo["backdrop_path"],
+            overview: mediaInfo["overview"],
+            releaseDate: mediaInfo[mediaType === MEDIA_TYPE.TV ? "first_air_date" : "release_date"],
+            voteScore: mediaInfo["vote_average"],
+            genreIds: mediaInfo["genre_ids"]
+        };
+    }
+
     async _getMovieInfo(tmdbId) {
         return JSON.parse(await request(`${serviceUrl}/movie/${tmdbId}?api_key=${apiKey}`));
     }
-    
+
     _separateMovieNameAndYear(name) {
         return { name: name.slice(0, name.length - 7), year: name.slice(-5, -1) };
     }
