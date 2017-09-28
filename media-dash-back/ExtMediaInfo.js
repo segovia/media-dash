@@ -1,5 +1,5 @@
-const MEDIA_TYPE = require("./media_type");
 const request = require("request-promise-native");
+const MEDIA_TYPE = require("./MediaType");
 
 const apiKey = "4156b1880c7c62c4a5391c5613c096a9";
 const serviceUrl = "https://api.themoviedb.org/3";

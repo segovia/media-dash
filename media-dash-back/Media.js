@@ -1,4 +1,4 @@
-const MEDIA_TYPE = require("./media_type");
+const MEDIA_TYPE = require("./MediaType");
 const deepAssign = require("deep-assign");
 
 module.exports = class Media {
@@ -27,7 +27,7 @@ module.exports = class Media {
     async _loadFileListing() {
         this.fileListing = await this.ct.cache.readOrLoadCache(
             this.fileListingCacheKey,
-            async () => await this.ct.mediaFiles.getFileListing());
+            async () => await this.ct.mediaLibrary.getFileListing());
     }
 
     async _loadImdbIds() {

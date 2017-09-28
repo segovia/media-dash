@@ -1,10 +1,10 @@
 const compression = require("compression");
 const express = require("express");
-const Cache = require("./cache");
-const MediaFiles = require("./media_files");
-const ExtMediaInfo = require("./ext_media_info");
-const Media = require("./media");
-const MEDIA_TYPE = require("./media_type");
+const Cache = require("./Cache");
+const MediaLibrary = require("./MediaLibrary");
+const ExtMediaInfo = require("./ExtMediaInfo");
+const Media = require("./Media");
+const MEDIA_TYPE = require("./MediaType");
 const app = express();
 app.use(compression());
 const port = 4000;
@@ -14,7 +14,7 @@ ct.props = { mediaDir: process.argv[2] };
 console.log("Media directory: " + ct.props.mediaDir);
 const services = [
     new Cache(ct),
-    new MediaFiles(ct),
+    new MediaLibrary(ct),
     new ExtMediaInfo(ct),
     new Media(ct)
 ];

@@ -1,23 +1,23 @@
 const { promisify } = require("util");
 const glob = promisify(require("glob"));
-const MEDIA_TYPE = require("./media_type")
+const MEDIA_TYPE = require("./MediaType");
 
 
 
-module.exports = class MediaFiles {
+module.exports = class MediaLibrary {
 
     constructor(ct) {
-        ct.mediaFiles = this;
+        ct.mediaLibrary = this;
         this.ct = ct;
     }
 
     async getFileListing() {
-        console.log("MediaFiles - INFO: Scanning file listing");
+        console.log("MediaLibrary - INFO: Scanning file listing");
         const start = new Date();
         const files = await glob(
             this.ct.props.mediaDir + `/@(${MEDIA_TYPE.TV}|${MEDIA_TYPE.MOVIE})/**/!(*.srt|*.sub|*.idx|*.jpg|*.smi|*.nfo)`,
             { nodir: true });
-        console.log(`MediaFiles - INFO: Files scanned, ${files.length} files found in ${new Date() - start}ms`);
+        console.log(`MediaLibrary - INFO: Files scanned, ${files.length} files found in ${new Date() - start}ms`);
         return this._toTree(files.map(s => s.substring(this.ct.props.mediaDir.length)));
     }
 
