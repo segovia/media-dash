@@ -4,6 +4,7 @@ const Cache = require("./Cache");
 const MediaLibrary = require("./MediaLibrary");
 const ExtMediaInfo = require("./ExtMediaInfo");
 const Media = require("./Media");
+const Subs = require("./Subs");
 const MEDIA_TYPE = require("./MediaType");
 const app = express();
 app.use(compression());
@@ -16,7 +17,8 @@ const services = [
     new Cache(ct),
     new MediaLibrary(ct),
     new ExtMediaInfo(ct),
-    new Media(ct)
+    new Media(ct),
+    new Subs(ct)
 ];
 services.reduce((p, s) => p.then(() => s.init && s.init()), Promise.resolve());
 

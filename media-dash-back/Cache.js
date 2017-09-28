@@ -1,6 +1,6 @@
 const os = require("os");
 const fse = require("fs-extra");
-const mediaDashDir = os.homedir() + "/.media-dash";
+const cacheDir = os.homedir() + "/.media-dash";
 
 module.exports = class Cache {
 
@@ -14,20 +14,25 @@ module.exports = class Cache {
 
     async createCacheFolder() {
         try {
-            await fse.mkdir(mediaDashDir);
-            console.log("Cache INFO: Cache folder created: " + mediaDashDir);
+            await fse.mkdir(cacheDir);
+            console.log("Cache INFO: Cache folder created: " + cacheDir);
         } catch (e) {
             if (e.code === "EEXIST") {
-                console.log("Cache INFO: Cache folder already exists: " + mediaDashDir);
+                console.log("Cache INFO: Cache folder already exists: " + cacheDir);
             } else {
                 console.log(e);
             }
         }
     }
 
+    getCacheFolderPath(filename) {
+        return `${cacheDir}/${filename}`;
+    }
+
+
     async readCache(filename) {
         try {
-            const result = await fse.readJson(`${mediaDashDir}/${filename}`, "utf8");
+            const result = await fse.readJson(this.getCacheFolderPath(filename), "utf8");
             return result;
         } catch (e) {
             return null;
@@ -43,7 +48,7 @@ module.exports = class Cache {
     }
 
     async persistCache(filename, obj) {
-        await fse.writeJson(`${mediaDashDir}/${filename}`, obj, { encoding: "utf-8" });
+        await fse.writeJson(this.getCacheFolderPath(filename), obj, { encoding: "utf-8" });
         console.log(`Cache INFO: Cache file '${filename}' written`);
     }
 };
