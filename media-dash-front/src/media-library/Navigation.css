@@ -1,0 +1,9 @@
+.MediaLibrary-Navigation {
+    flex: 0 0 400px;
+    background-color: #252526;
+}
+
+.MediaLibrary-Navigation .nav-tabs {
+    background-color: #333333;
+    border-right: 10px solid #2D2D2D;
+}

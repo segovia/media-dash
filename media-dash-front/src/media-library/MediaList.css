@@ -1,0 +1,13 @@
+.MediaLibrary-MediaList {
+    height: calc(100vh - 91px);
+    overflow: scroll;
+    overflow-x: hidden;
+}
+
+.MediaLibrary-MediaList::-webkit-scrollbar {
+    width: 10px;  /* remove scrollbar space */
+    background: #2D2D2D;
+}
+.MediaLibrary-MediaList::-webkit-scrollbar-thumb {
+    background: #515151;
+}

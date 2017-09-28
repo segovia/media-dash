@@ -1,4 +1,4 @@
 export default {
-    TV: "TV Shows",
-    MOVIE: "Movies"
+    MOVIE: "Movies",
+    TV: "TV Shows"
 };
