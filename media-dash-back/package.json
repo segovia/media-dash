@@ -10,7 +10,7 @@
     "express": "^4.15.4",
     "fs-extra": "^4.0.2",
     "glob": "^7.1.2",
-    "opensubtitles-api": "^4.0.0",
+    "opensubtitles-api": "https://github.com/segovia/opensubtitles-api",
     "request": "^2.82.0",
     "request-promise-native": "^1.0.4"
   },

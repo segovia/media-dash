@@ -922,9 +922,9 @@ onetime@^2.0.0:
   dependencies:
     mimic-fn "^1.0.0"
 
-opensubtitles-api@^4.0.0:
+"opensubtitles-api@https://github.com/segovia/opensubtitles-api":
   version "4.0.0"
-  resolved "https://registry.yarnpkg.com/opensubtitles-api/-/opensubtitles-api-4.0.0.tgz#3066154068de0431b803a82452c69946f89109fd"
+  resolved "https://github.com/segovia/opensubtitles-api#a936ffc17615c41b6d41e018a2a2e34d7dda4b1c"
   dependencies:
     urijs "1.x.x"
     xmlrpc "1.x.x"
@@ -1321,8 +1321,8 @@ unpipe@~1.0.0:
   resolved "https://registry.yarnpkg.com/unpipe/-/unpipe-1.0.0.tgz#b2bf4ee8514aae6165b4817829d21b2ef49904ec"
 
 urijs@1.x.x:
-  version "1.18.12"
-  resolved "https://registry.yarnpkg.com/urijs/-/urijs-1.18.12.tgz#f04d91e1fabb29c16fc842f9a14ee8ddc3fda64e"
+  version "1.19.0"
+  resolved "https://registry.yarnpkg.com/urijs/-/urijs-1.19.0.tgz#d8aa284d0e7469703a6988ad045c4cbfdf08ada0"
 
 util-deprecate@~1.0.1:
   version "1.0.2"

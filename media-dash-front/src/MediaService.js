@@ -1,5 +1,7 @@
 import MediaType from './MediaType';
+import Immutable from 'seamless-immutable'
 
+const inMemoryCache = {};
 
 async function mediaListing() {
     const response = await fetch('/media-listing');
@@ -7,19 +9,20 @@ async function mediaListing() {
 };
 
 function transformMediaListing(original) {
-    return {
+    return Immutable({
         [MediaType.MOVIE]: transformMediaListingForType(original, MediaType.MOVIE),
         [MediaType.TV]: transformMediaListingForType(original, MediaType.TV)
-    }
+    });
 }
 
 function transformMediaListingForType(mediaListing, mediaType) {
     const folder = mediaListing[mediaType].children;
-    return Object.keys(folder).map((title) => ({
-        id: title,
-        title: (mediaType === MediaType.TV ? title : removeYearFromTitle(title)),
-        imdbId: folder[title].imdbId,
-        mediaType: mediaType
+    return Object.keys(folder).map((fileName, index) => ({
+        id: fileName,
+        title: (mediaType === MediaType.TV ? fileName : removeYearFromTitle(fileName)),
+        imdbId: folder[fileName].imdbId,
+        mediaType,
+        active: false
     }));
 }
 
@@ -28,11 +31,34 @@ function removeYearFromTitle(title) {
 }
 
 const mediaInfo = async (imdbId, mediaType) => {
-    const json = await (await fetch(`/${mediaType === MediaType.TV ? 'tv' : 'movie'}/${imdbId}`)).json();
-    json.tmdbId = json.id;
-    delete json.id;
-    return json;
+    return cacheInMemory('mediaInfo', imdbId,
+        async () => (await fetch(`/${mediaType === MediaType.TV ? 'tv' : 'movie'}/${imdbId}`)).json());
 };
 
+const movieSubs = async (imdbId, language) => {
+    return cacheInMemory('movieSubs', [imdbId, language],
+        async () => await fetchSubs(`/movie/${imdbId}/subs/${language}`));
+};
 
-export default { mediaListing, mediaInfo }
+const tvShowSubs = async (imdbId, season, episode, language) => {
+    return cacheInMemory('tvShowSubs', [imdbId, season, episode, language],
+        async () => await fetchSubs(`/tv/${imdbId}/${season}/${episode}/subs/${language}`));
+};
+
+const fetchSubs = async (url) =>  (await fetch(url)).json();
+
+const cacheInMemory = async (cacheName, key, update) => {
+    let cache = inMemoryCache[cacheName];
+    if (!cache) {
+        cache = {};
+        inMemoryCache[cacheName] = cache;
+    }
+    let value = cache[key];
+    if (!value) {
+        value = await update();
+        cache[key] = value;
+    }
+    return value;
+}
+
+export default { mediaListing, mediaInfo, movieSubs, tvShowSubs }

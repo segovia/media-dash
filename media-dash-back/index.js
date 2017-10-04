@@ -26,8 +26,19 @@ app.get("/media-listing", (req, res) => {
     res.send(ct.media.getMediaListing());
 });
 
+app.get("/movie/:imdbId/subs/:language", async (req, res) => {
+    res.send(await ct.subs.getMovieSubsByImdb(req.params.imdbId, req.params.language));
+});
+
 app.get("/movie/:imdbId", async (req, res) => {
     res.send(await ct.extMediaInfo.getInfo(req.params.imdbId, MEDIA_TYPE.MOVIE));
+});
+
+app.get("/tv/:imdbId/:season/:episode/subs/:language", async (req, res) => {
+    res.send(await ct.subs.getTVShowEpisodeSubsByImdb(req.params.imdbId,
+        req.params.season,
+        req.params.episode,
+        req.params.language));
 });
 
 app.get("/tv/:imdbId", async (req, res) => {

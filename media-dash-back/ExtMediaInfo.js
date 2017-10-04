@@ -4,12 +4,27 @@ const MEDIA_TYPE = require("./MediaType");
 const apiKey = "4156b1880c7c62c4a5391c5613c096a9";
 const serviceUrl = "https://api.themoviedb.org/3";
 
+
+const doGetInfoRequest = async (self, imdbId, mediaType) => {
+    const response = JSON.parse(await request(`${serviceUrl}/find/${imdbId}?api_key=${apiKey}&external_source=imdb_id`));
+    const mediaInfo = response[mediaType === MEDIA_TYPE.TV ? "tv_results" : "movie_results"][0];
+    return {
+        title: mediaInfo[mediaType === MEDIA_TYPE.TV ? "name" : "title"],
+        posterPath: mediaInfo["poster_path"],
+        backdropPath: mediaInfo["backdrop_path"],
+        overview: mediaInfo["overview"],
+        releaseDate: mediaInfo[mediaType === MEDIA_TYPE.TV ? "first_air_date" : "release_date"],
+        voteScore: mediaInfo["vote_average"],
+        genreIds: mediaInfo["genre_ids"]
+    };
+};
+
 module.exports = class ExtMediaInfo {
 
     constructor(ct) {
         ct.extMediaInfo = this;
+        this.ct = ct;
     }
-
 
     async getImdbId(title, mediaType) {
         if (mediaType === MEDIA_TYPE.MOVIE) return await this.getMovieImdbId(title);
@@ -36,17 +51,10 @@ module.exports = class ExtMediaInfo {
     }
 
     async getInfo(imdbId, mediaType) {
-        const response = JSON.parse(await request(`${serviceUrl}/find/${imdbId}?api_key=${apiKey}&external_source=imdb_id`));
-        const mediaInfo = response[mediaType === MEDIA_TYPE.TV ? "tv_results" : "movie_results"][0];
-        return {
-            title: mediaInfo[mediaType === MEDIA_TYPE.TV ? "name" : "title"],
-            posterPath: mediaInfo["poster_path"],
-            backdropPath: mediaInfo["backdrop_path"],
-            overview: mediaInfo["overview"],
-            releaseDate: mediaInfo[mediaType === MEDIA_TYPE.TV ? "first_air_date" : "release_date"],
-            voteScore: mediaInfo["vote_average"],
-            genreIds: mediaInfo["genre_ids"]
-        };
+        return this.ct.cache.readOrLoadCacheValue(
+            "ext-media-info.json", 
+            `${imdbId}___${mediaType}`,
+            async () => await doGetInfoRequest(this, imdbId, mediaType));
     }
 
     async _getMovieInfo(tmdbId) {

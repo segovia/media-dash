@@ -1,26 +1,27 @@
-import React from 'react';
+import React, { PureComponent } from 'react';
 import PropTypes from 'prop-types';
 import { ListGroup, ListGroupItem } from 'react-bootstrap';
 import './MediaList.css'
 
-MediaList.propTypes = {
-    activeMediaEntry: PropTypes.object,
-    mediaEntries: PropTypes.array.isRequired,
-    onClick: PropTypes.func.isRequired
-};
-
-export default function MediaList(props) {
-    return (
-        <ListGroup className="MediaLibrary-MediaList">
-            {props.mediaEntries.map((mediaEntry) => (
-                <ListGroupItem
-                    active={props.activeMediaEntry && props.activeMediaEntry.id === mediaEntry.id}
-                    onClick={() => props.onClick(mediaEntry)}
-                    key={mediaEntry.id}
-                >
-                    <span>{mediaEntry.title}</span>
-                </ListGroupItem>
-            ))}
-        </ListGroup>
-    );
-};
+export default class MediaList extends PureComponent {
+    static propTypes = {
+        activeMediaEntry: PropTypes.object,
+        mediaEntries: PropTypes.array.isRequired,
+        onClick: PropTypes.func.isRequired
+    };
+    render() {
+        return (
+            <ListGroup className="MediaLibrary-MediaList">
+                {this.props.mediaEntries.map((mediaEntry) => (
+                    <ListGroupItem
+                        active={this.props.activeMediaEntry && this.props.activeMediaEntry.id === mediaEntry.id}
+                        onClick={() => this.props.onClick(mediaEntry)}
+                        key={mediaEntry.id}
+                    >
+                        <span>{mediaEntry.title}</span>
+                    </ListGroupItem>
+                ))}
+            </ListGroup>
+        );
+    }
+}

@@ -1,24 +1,25 @@
-const os = require("os");
 const fse = require("fs-extra");
-const cacheDir = os.homedir() + "/.media-dash";
 
 module.exports = class Cache {
 
     constructor(ct) {
         ct.cache = this;
+        this.ct = ct;
+        this.caches = {};
     }
 
     async init() {
+        this.cacheDir = this.ct.props.mediaDir + "/.media-dash";
         await this.createCacheFolder();
     }
 
     async createCacheFolder() {
         try {
-            await fse.mkdir(cacheDir);
-            console.log("Cache INFO: Cache folder created: " + cacheDir);
+            await fse.mkdir(this.cacheDir);
+            console.log("Cache INFO: Cache folder created: " + this.cacheDir);
         } catch (e) {
             if (e.code === "EEXIST") {
-                console.log("Cache INFO: Cache folder already exists: " + cacheDir);
+                console.log("Cache INFO: Cache folder already exists: " + this.cacheDir);
             } else {
                 console.log(e);
             }
@@ -26,7 +27,7 @@ module.exports = class Cache {
     }
 
     getCacheFolderPath(filename) {
-        return `${cacheDir}/${filename}`;
+        return `${this.cacheDir}/${filename}`;
     }
 
 
@@ -40,7 +41,9 @@ module.exports = class Cache {
     }
 
     async readOrLoadCache(cacheKey, contentLoad) {
-        let data = await this.readCache(cacheKey);
+        let data = this.caches[cacheKey];
+        if (data) return data;
+        data = await this.readCache(cacheKey);
         if (data) return data;
         data = await contentLoad();
         await this.persistCache(cacheKey, data);
@@ -50,5 +53,15 @@ module.exports = class Cache {
     async persistCache(filename, obj) {
         await fse.writeJson(this.getCacheFolderPath(filename), obj, { encoding: "utf-8" });
         console.log(`Cache INFO: Cache file '${filename}' written`);
+    }
+
+    async readOrLoadCacheValue (filename, key, loadNewValue) {
+        const cache = await this.readOrLoadCache(filename, () => ({}));
+        const cached = cache[key];
+        if (cached) return cached;
+        const newValue = await loadNewValue();
+        cache[key] = newValue;
+        this.persistCache(filename, cache);
+        return newValue;
     }
 };

@@ -5,9 +5,7 @@ import MediaList from './MediaList';
 import './Navigation.css'
 
 Navigation.propTypes = {
-    activeMediaEntry: PropTypes.object,
-    activeMediaType: PropTypes.string,
-    mediaListing: PropTypes.object.isRequired,
+    navigation: PropTypes.object.isRequired,
     onMediaEntryClick: PropTypes.func.isRequired,
     onTabSelect: PropTypes.func.isRequired,
 };
@@ -17,16 +15,16 @@ export default function Navigation(props) {
         <div className="MediaLibrary-Navigation">
             <Tabs
                 id="MediaLibrary-Navigation-Tabs"
-                activeKey={props.activeMediaType}
+                activeKey={props.navigation.activeMediaType}
                 onSelect={props.onTabSelect}>
-                {Object.keys(props.mediaListing).map((mediaType) => (
+                {Object.entries(props.navigation.mediaListing).map(([mediaType, mediaEntries]) => (
                     <Tab
                         eventKey={mediaType}
                         title={mediaType}
                         key={mediaType}>
                         <MediaList
-                            activeMediaEntry={props.activeMediaEntry}
-                            mediaEntries={props.mediaListing[mediaType]}
+                            activeMediaEntry={props.navigation.activeMediaEntry}
+                            mediaEntries={mediaEntries}
                             onClick={props.onMediaEntryClick}
                         />
                     </Tab>
