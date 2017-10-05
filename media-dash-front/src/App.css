@@ -19,6 +19,10 @@ body, button.list-group-item {
 .list-group {
     margin-bottom: 0;
 }
+.list-group-item {
+    outline: none;
+}
+
 button.list-group-item {
     background-color: #252526;
     border-color: transparent;
@@ -37,6 +41,7 @@ button.list-group-item.active:focus {
     border-color: transparent;
     background-color: #134971;
 }
+
 .navbar {
     margin-bottom: 0;
 }
@@ -54,4 +59,8 @@ button.list-group-item.active:focus {
     background-color: #252526;
     color: white;
     border: none;
+}
+
+.label-info {
+    background-color: #3a778a;
 }

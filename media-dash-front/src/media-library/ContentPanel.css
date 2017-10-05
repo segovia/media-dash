@@ -8,6 +8,14 @@
     z-index: 1;
 }
 
+.MediaLibrary-ContentPanel-header::after {
+    /* does clearfix */
+    content: " ";
+    display: block;
+    height: 0;
+    clear: both;
+}
+
 .MediaLibrary-ContentPanel:before {
     content: "";
     position: absolute;
@@ -32,4 +40,8 @@
 .MediaLibrary-ContentPanel-poster > img {
     width: 100%;
     height: 100%;
+}
+
+.MediaLibrary-ContentPanel .label {
+    margin: 0 3px;
 }
