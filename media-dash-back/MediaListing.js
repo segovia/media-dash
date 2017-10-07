@@ -1,7 +1,7 @@
 const MEDIA_TYPE = require("./MediaType");
 const Immutable = require("seamless-immutable");
 
-const titleToImdbIdMapCacheKey = "imdb-ids.json";
+const titleToImdbIdMapCacheFile = "imdb-ids.json";
 
 module.exports = class MediaListing {
     constructor(ct) {
@@ -10,14 +10,25 @@ module.exports = class MediaListing {
     }
 
     async init() {
+        await this.refresh();
+    }
+
+    async refresh() {
         try {
+            const start = new Date();
             const titleToImdbIdMap = await loadTitleToImdbIdMap(this.ct);
             const fileListing = await this.ct.fileListing.get();
             this.listing = await buildMediaListing(fileListing, titleToImdbIdMap);
             await requestAndFillInMissingImdbIds(this.ct, this.listing, titleToImdbIdMap);
+            console.log(`MediaListing INFO: Listing refreshed in ${new Date() - start}ms`);
         } catch (e) {
             console.log(e);
         }
+    }
+
+    async refreshMedia(mediaType, mediaName) {
+        await this.ct.fileListing.refresh(mediaType, mediaName);
+        await this.refresh();
     }
 
     get() {
@@ -28,10 +39,10 @@ module.exports = class MediaListing {
         // not optimal runtime, imdbId to title could be precomputed if perfomance is bad
         const listingsVals = Object.values(this.listing);
         for (let i = 0; i < listingsVals.length; i++) {
-            const found = Object.values(listingsVals[i].children).find((v) => {
+            const found = Object.entries(listingsVals[i].children).find(([k, v]) => { //eslint-disable-line no-unused-vars
                 return v.imdbId === imdbId;
             });
-            if (found) return found;
+            if (found) return Object.assign({}, found[1], {name: found[0]});
         }
         return "not found";
     }
@@ -39,8 +50,8 @@ module.exports = class MediaListing {
 
 
 const loadTitleToImdbIdMap = async (ct) => {
-    return ct.cache.readOrLoadCache(
-        titleToImdbIdMapCacheKey,
+    return ct.cache.readOrCreateFile(
+        titleToImdbIdMapCacheFile,
         () => ({ [MEDIA_TYPE.MOVIE]: {}, [MEDIA_TYPE.TV]: {} }));
 };
 
@@ -65,7 +76,7 @@ const requestAndFillInMissingImdbIds = async (ct, mediaListing, imdbIds) => {
 
 const updateBatch = async (ct, mediaListing, imdbIds, batch) => {
     const promises = batch.map(async (entry) => {
-        const imdbId = await ct.extMediaInfo.getImdbId(entry.title, entry.type);
+        const imdbId = await ct.mediaInfo.getImdbId(entry.title, entry.type);
         console.log(`Media INFO: imdb id retrieved for ${entry.title} -> ${imdbId}`);
         if (imdbId != undefined) {
             mediaListing[entry.type].children[entry.title].imdbId = imdbId;
@@ -148,6 +159,6 @@ const sleep = (ms) => {
 };
 
 const saveImdbIds = async (ct, imdbIds) => {
-    await ct.cache.persistCache(titleToImdbIdMapCacheKey, imdbIds);
+    await ct.cache.persistFile(titleToImdbIdMapCacheFile, imdbIds);
 };
 

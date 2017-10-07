@@ -13,7 +13,11 @@ export default class MediaLibrary extends Component {
     }
 
     componentWillMount = () => {
-        MediaService.mediaListing().then(mediaListing => this.setState({
+        this.refreshMediaListing();
+    }
+
+    refreshMediaListing = async () => {
+        return MediaService.mediaListing().then(mediaListing => this.setState({
             navigation: this.state.navigation.set('mediaListing', mediaListing)
         }));
     }
@@ -25,24 +29,43 @@ export default class MediaLibrary extends Component {
     onMediaEntryClick = async (mediaEntry) => {
         this.setState({
             navigation:
-            this.state.navigation.set('activeMediaEntry', { id: mediaEntry.id, mediaType: mediaEntry.mediaType }),
-            mediaInfo: mediaEntry
+            this.state.navigation.set('activeMediaEntry', {
+                id: mediaEntry.id,
+                mediaType: mediaEntry.mediaType
+            }),
+            mediaInfo: Immutable(mediaEntry)
         });
 
-        const promises = [];
-        promises.push(MediaService.mediaInfo(mediaEntry.imdbId, mediaEntry.mediaType)
-            .then(info => { this.setState({ mediaInfo: { ...this.state.mediaInfo, ...info } }) }));
-        if (mediaEntry.mediaType === MediaType.MOVIE) {
-            promises.push(MediaService.movieSubs(mediaEntry.imdbId, 'eng')
+        return this.loadMediaInfo(mediaEntry.imdbId, mediaEntry.mediaType);
+    }
+
+    loadMediaInfo(imdbId, mediaType, forceUpdate) {
+        MediaService.mediaInfo(imdbId, mediaType, forceUpdate)
+            .then(info => { this.setState({ mediaInfo: this.state.mediaInfo.merge(info) }) });
+        if (mediaType === MediaType.MOVIE) {
+            MediaService.movieSubs(imdbId, 'eng')
                 .then(subs => {
                     // make sure that the subs received match the current entry
-                    if (mediaEntry.imdbId !== this.state.mediaInfo.imdbId) return;
-                    this.setState({
-                        mediaInfo: { ...this.state.mediaInfo, subs }
-                    })
-                }));
+                    if (imdbId !== this.state.mediaInfo.imdbId) return;
+                    this.setState({ mediaInfo: this.state.mediaInfo.set('subs', subs) });
+                })
+                .catch(e => {
+                    console.log(e.stack);
+                    this.setState({ mediaInfo: this.state.mediaInfo.set('subsError', e.stack) });
+                });
         }
-        return Promise.all(promises);
+    }
+
+    onInstallSub = async (subId) => {
+        await MediaService.installSub(subId);
+        this.refresh();
+    }
+
+    refresh() {
+        this.refreshMediaListing();
+        if (this.state.mediaInfo && this.state.mediaInfo.imdbId) {
+            this.loadMediaInfo(this.state.mediaInfo.imdbId, this.state.mediaInfo.mediaType, true);
+        }
     }
 
     render() {
@@ -53,7 +76,7 @@ export default class MediaLibrary extends Component {
                     navigation={this.state.navigation}
                     onTabSelect={this.onTabSelect}
                     onMediaEntryClick={this.onMediaEntryClick} />
-                <ContentPanel mediaInfo={this.state.mediaInfo} />
+                <ContentPanel mediaInfo={this.state.mediaInfo} onInstallSub={this.onInstallSub} />
             </div>
         );
     }

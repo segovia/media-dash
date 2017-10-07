@@ -1,14 +1,18 @@
 const OS = require("opensubtitles-api");
+const osSubsCacheFile = "os-subs.json";
 
 const getSubs = async (self, args) => {
     if (!self.os) {
         console.log("Cannot connect to opensubtitles, credentials are not valid");
         return;
     }
-    return await self.ct.cache.readOrLoadCacheValue(
-        "os-subs.json",
+    return (await self.ct.cache.readOrCreateValueInFile(
+        osSubsCacheFile,
         Object.values(args).join("___"),
-        async () => Object.values(await searchForSubs(self, args))[0]);
+        async () => ({
+            searchArgs: args,
+            results: Object.values(await searchForSubs(self, Object.assign({}, args)))[0]
+        }))).results;
 };
 
 const searchForSubs = (self, params) => {
@@ -31,9 +35,9 @@ module.exports = class SubsProvider {
         const filename = "os-credentials";
         const credentialsAreValid = await this.updateCredentialsAndValidate();
         if (!credentialsAreValid) {
-            await this.ct.cache.persistCache(filename, { useragent: null, username: null, password: null });
+            await this.ct.data.persistFile(filename, { useragent: null, username: null, password: null });
             console.log("Opensubtitles credentials missing.");
-            console.log(`Please fill out ${this.ct.cache.getCacheFolderPath(filename)} and restart the server`);
+            console.log(`Please fill out ${this.ct.data.getFilePath(filename)} and restart the server`);
         }
         const subs = this;
         this.os = new OS({
@@ -46,7 +50,7 @@ module.exports = class SubsProvider {
 
     async updateCredentialsAndValidate() {
         if (this.areCredentialsValid()) return true;
-        this.credentials = await this.ct.cache.readCache("os-credentials");
+        this.credentials = await this.ct.data.readFile("os-credentials");
         return this.areCredentialsValid();
     }
 
@@ -72,5 +76,17 @@ module.exports = class SubsProvider {
             // path: "/home/gustavo/workspace/torrent-dash/back/test/Media/TV Shows/Game of Thrones/Season 06/Game of Thrones - S06E10 - The Winds of Winter.mp4",
             limit: 10
         });
+    }
+
+    async getSub(subId) {
+        const osFile = await this.ct.cache.readFile(osSubsCacheFile);
+        const cachedSearches = Object.values(osFile);
+        for (let i = 0; i < cachedSearches.length; i++) {
+            const result = cachedSearches[i].results.find(r => r.id === subId);
+            if (result) {
+                return {searchArgs: cachedSearches[i].searchArgs, result: result};
+            }
+        }
+        return null;
     }
 };

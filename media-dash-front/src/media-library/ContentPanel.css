@@ -2,10 +2,19 @@
     flex-grow: 1;
     background-repeat: no-repeat;
     background-size: cover;
-    padding-left: 30px;
     background-color: #1E1E1E;
     position: relative;
     z-index: 1;
+}
+
+.MediaLibrary-ContentPanel-inner-wrapper {
+    width: 100%;
+    position: absolute;
+    padding-left: 30px;
+    padding-right: 20px;
+}
+.MediaLibrary-ContentPanel-header {
+    margin-bottom: 20px;
 }
 
 .MediaLibrary-ContentPanel-header::after {
@@ -44,4 +53,10 @@
 
 .MediaLibrary-ContentPanel .label {
     margin: 0 3px;
+}
+
+
+.alert strong {
+    font-size: 150%;
+    line-height: 200%;
 }

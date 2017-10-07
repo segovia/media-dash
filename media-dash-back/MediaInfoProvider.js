@@ -4,6 +4,31 @@ const MEDIA_TYPE = require("./MediaType");
 const apiKey = "4156b1880c7c62c4a5391c5613c096a9";
 const serviceUrl = "https://api.themoviedb.org/3";
 
+module.exports = class MediaInfoProvider {
+    constructor(ct) {
+        ct.mediaInfoProvider = this;
+        this.ct = ct;
+    }
+    async getImdbId(title, mediaType) {
+        try {
+            return mediaType === MEDIA_TYPE.MOVIE ? getMovieImdbId(title) : getTVShowImdbId(title);
+        } catch (e) {
+            console.log(`Error code received for ${title}: ${e}`);
+            return null;
+        }
+    }
+    async getInfo(imdbId, mediaType) {
+        return this.ct.cache.readOrCreateValueInFile(
+            "ext-media-info.json",
+            `${imdbId}___${mediaType}`,
+            async () => await doGetInfoRequest(this, imdbId, mediaType));
+    }
+    async _loadImdbIds() {
+        this.imdbIds = await this.ct.cache.readOrCreateFile(
+            this.imdbIdsCacheFile,
+            () => ({ [MEDIA_TYPE.MOVIE]: {}, [MEDIA_TYPE.TV]: {} }));
+    }
+};
 
 const doGetInfoRequest = async (self, imdbId, mediaType) => {
     const response = JSON.parse(await request(`${serviceUrl}/find/${imdbId}?api_key=${apiKey}&external_source=imdb_id`));
@@ -61,30 +86,4 @@ const searchTVShow = async (name) => {
 
 const getTVShowInfo = async (tmdbId) => {
     return JSON.parse(await request(`${serviceUrl}/tv/${tmdbId}/external_ids?api_key=${apiKey}`));
-};
-
-module.exports = class ExtMediaInfo {
-    constructor(ct) {
-        ct.extMediaInfo = this;
-        this.ct = ct;
-    }
-    async getImdbId(title, mediaType) {
-        try {
-            return mediaType === MEDIA_TYPE.MOVIE ? getMovieImdbId(title) : getTVShowImdbId(title);
-        } catch (e) {
-            console.log(`Error code received for ${title}: ${e}`);
-            return null;
-        }
-    }
-    async getInfo(imdbId, mediaType) {
-        return this.ct.cache.readOrLoadCacheValue(
-            "ext-media-info.json",
-            `${imdbId}___${mediaType}`,
-            async () => await doGetInfoRequest(this, imdbId, mediaType));
-    }
-    async _loadImdbIds() {
-        this.imdbIds = await this.ct.cache.readOrLoadCache(
-            this.imdbIdsCacheKey,
-            () => ({ [MEDIA_TYPE.MOVIE]: {}, [MEDIA_TYPE.TV]: {} }));
-    }
 };

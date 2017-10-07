@@ -1,8 +1,9 @@
 const compression = require("compression");
 const express = require("express");
-const Cache = require("./Cache");
+const Persistence = require("./Persistence");
 const FileListing = require("./FileListing");
-const ExtMediaInfo = require("./ExtMediaInfo");
+const ExtMediaInfo = require("./MediaInfoProvider");
+const MediaInfo = require("./MediaInfo");
 const MediaListing = require("./MediaListing");
 const Subs = require("./Subs");
 const SubsProvider = require("./SubsProvider");
@@ -11,22 +12,28 @@ const port = 4000;
 
 const ct = {};
 ct.props = { mediaDir: process.argv[2] };
-console.log("Media directory: " + ct.props.mediaDir);
+console.log(`Media directory:  ${ct.props.mediaDir}`);
 const services = [
-    new Cache(ct),
+    new Persistence(ct, "cache"),
+    new Persistence(ct, "data"),
+    new Persistence(ct, "tmp"),
     new FileListing(ct),
     new ExtMediaInfo(ct),
+    new MediaInfo(ct),
     new MediaListing(ct),
     new SubsProvider(ct),
     new Subs(ct)
 ];
-services.reduce((p, s) => p.then(() => s.init && s.init()), Promise.resolve());
+
+services.reduce((p, s) => p.then(() => s.init && s.init()).catch(console.log), Promise.resolve());
 
 const app = express();
 
 app.use(compression());
 
-const wrapAsync = fn => (...args) => fn(...args).catch(args[2]);
+const wrapAsync = fn => (req, res, next) => fn(req, res, next).catch((e) => {
+    res.status(500).send(e.stack);
+});
 
 app.get("/test", (req, res) => {
     res.send(ct.mediaListing.getEntry("tt2975590"));
@@ -41,10 +48,7 @@ app.get("/movie/:imdbId/subs/:language", wrapAsync(async (req, res) => {
 }));
 
 app.get("/movie/:imdbId", wrapAsync(async (req, res) => {
-    const imdbId = req.params.imdbId;
-    const movieInfo = await ct.extMediaInfo.getInfo(imdbId, MEDIA_TYPE.MOVIE);
-    movieInfo.subLangs = ct.mediaListing.getEntry(imdbId).subLangs;
-    res.send(movieInfo);
+    res.send(await ct.mediaInfo.getInfo(req.params.imdbId, MEDIA_TYPE.MOVIE));
 }));
 
 app.get("/tv/:imdbId/:season/:episode/subs/:language", wrapAsync(async (req, res) => {
@@ -55,7 +59,11 @@ app.get("/tv/:imdbId/:season/:episode/subs/:language", wrapAsync(async (req, res
 }));
 
 app.get("/tv/:imdbId", wrapAsync(async (req, res) => {
-    res.send(await ct.extMediaInfo.getInfo(req.params.imdbId, MEDIA_TYPE.TV));
+    res.send(await ct.mediaInfo.getInfo(req.params.imdbId, MEDIA_TYPE.TV));
+}));
+
+app.get("/subs/install/:subId", wrapAsync(async (req, res) => {
+    res.send(await ct.subs.install(req.params.subId));
 }));
 
 app.get("/", wrapAsync(async (req, res) => {

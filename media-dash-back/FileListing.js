@@ -3,7 +3,7 @@ const Immutable = require("seamless-immutable");
 const glob = promisify(require("glob"));
 const MEDIA_TYPE = require("./MediaType");
 
-const cacheKey = "file-listing.json";
+const cacheFile = "file-listing.json";
 
 module.exports = class FileListing {
     constructor(ct) {
@@ -11,20 +11,40 @@ module.exports = class FileListing {
         this.ct = ct;
     }
     async get() {
-        return this.ct.cache.readOrLoadCache(
-            cacheKey,
+        return this.ct.cache.readOrCreateFile(
+            cacheFile,
             async () => await scanForMediaFiles(this.ct.props.mediaDir));
     }
+
+    getPath(mediaType, mediaName) {
+        return `${this.ct.props.mediaDir}/${mediaType}/${mediaName}`;
+    }
+
+    async refresh(mediaType, mediaName) {
+        await refresh(this, this.ct.props.mediaDir, mediaType, mediaName);
+    }
+
+};
+
+const refresh = async (self, mediaDir, mediaType, mediaName) => {
+    const files = await glob(
+        `${mediaDir}/${mediaType}/${mediaName}/**/!(*.idx|*.jpg|*.smi|*.nfo)`,
+        { nodir: true });
+    const tree = toTree(files.map(s => s.substring(`${mediaDir}/${mediaType}`.length)));
+    
+    const cache = await self.ct.cache.readFile(cacheFile);
+    cache[mediaType].children[mediaName] = tree[mediaName];
+    self.ct.cache.persistFile(cacheFile, cache);
 };
 
 const scanForMediaFiles = async (mediaDir) => {
-    console.log("FileListing - INFO: Scanning file listing");
+    console.log("FileListing INFO: Scanning file listing");
     const start = new Date();
     const files = await glob(
-        mediaDir + `/@(${MEDIA_TYPE.TV}|${MEDIA_TYPE.MOVIE})/**/!(*.idx|*.jpg|*.smi|*.nfo)`,
+        `${mediaDir}/@(${MEDIA_TYPE.TV}|${MEDIA_TYPE.MOVIE})/**/!(*.idx|*.jpg|*.smi|*.nfo)`,
         { nodir: true });
-    console.log(`FileListing - INFO: Files scanned, ${files.length} files found in ${new Date() - start}ms`);
-    return Immutable(toTree(files.map(s => s.substring(mediaDir.length))));
+    console.log(`FileListing INFO: Files scanned, ${files.length} files found in ${new Date() - start}ms`);
+    return toTree(files.map(s => s.substring(mediaDir.length)));
 };
 
 const toTree = (fileList) => {
