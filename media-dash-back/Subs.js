@@ -1,7 +1,9 @@
+const path = require("path");
 const { promisify } = require("util");
 const download = promisify(require("download-file"));
 const fse = require("fs-extra");
 const MEDIA_TYPE = require("./MediaType");
+const MediaListing = require("./MediaListing");
 
 const subsStatusDataFile = "subs-status.json";
 
@@ -11,51 +13,90 @@ module.exports = class Subs {
         this.ct = ct;
     }
 
-    async getStatus(imdbId) {
-        return this.ct.data.readValueFromFile(subsStatusDataFile, imdbId);
+    async getStatus(mediaId) {
+        return this.ct.data.readValueInFile(subsStatusDataFile, mediaId);
     }
 
-    async install(subId) {
-        const sub = await this.ct.subsProvider.getSub(subId);
-        const imdbId = sub.searchArgs.imdbid;
-        const lang = sub.searchArgs.sublanguageid;
+    async tryAnother(mediaId, lang) {
+        const mediaEntry = await this.ct.mediaListing.getEntry(mediaId);
+        if (mediaEntry.type !== MEDIA_TYPE.MOVIE && mediaEntry.type !== MEDIA_TYPE.EPISODE) {
+            console.log(`Subs ERROR: It is not possible to 'try another' sub for media of type ${mediaEntry.type}`);
+            return;
+        }
+        const imdbId = await this.ct.mediaInfo.getImdbId(mediaId);
+        const subs = await (mediaEntry.type === MEDIA_TYPE.MOVIE ?
+            this.ct.subsProvider.getMovieSubs(lang, imdbId, mediaEntry.filepath) :
+            getEpisodeSubs(this, lang, imdbId, mediaEntry));
 
-        const fileEntry = await this.ct.mediaListing.getEntry(imdbId);
+        const tested = await getAlreadyUsedSubs(this, mediaId, lang);
+        let sub = subs.find(s => !tested.has(s.id));
+        if (!sub) {
+            console.log("Subs ERROR: All subs were tested, just going to use the first sub.");
+            sub = subs[0];
+        }
+        await this.install(mediaId, mediaEntry.filepath, lang, sub, subs.length);
+    }
 
-        const tmpFilename = `${fileEntry.name}.${lang}.srt.tmp`;
-        const mediaType = MEDIA_TYPE.MOVIE;
-        await download(sub.result.url, { directory: `${this.ct.tmp.getDir()}`, filename: tmpFilename });
-        await activate(this.ct.tmp.getFilePath(tmpFilename), this.ct.fileListing.getPath(mediaType, fileEntry.name), fileEntry.name, lang);
-        await updateStatus(this, subId, imdbId, lang);
-        await this.ct.mediaListing.refreshMedia(mediaType, fileEntry.name);
+    async resetTested(mediaId, lang) {
+        if (lang !== MediaListing.DEFAULT_SUB_LANG) {
+            const status = await this.getStatus(mediaId);
+            if (status && status[lang]) {
+                delete status[lang];
+                await this.ct.data.setValueInFile(subsStatusDataFile, mediaId, status);
+            }
+        }
+        await this.tryAnother(mediaId, "eng");
+    }
 
-        return "ok";
+    async install(mediaId, filepath, lang, sub, availableSubsCount) {
+        const normalizedLang = lang === MediaListing.DEFAULT_SUB_LANG ? "eng" : lang;
+        const fileDir = this.ct.mediaListing.getAbsoluteMediaPath(path.dirname(filepath));
+        const baseFilename = basenameWithoutExtension(filepath);
+        const tmpFilename = `${baseFilename}.${normalizedLang}.srt.tmp`;
+        await download(sub.url, { directory: `${this.ct.tmp.getDir()}`, filename: tmpFilename });
+        await activate(this.ct.tmp.getFilePath(tmpFilename), fileDir, baseFilename, normalizedLang);
+        await updateStatus(this, sub.id, mediaId, normalizedLang, availableSubsCount);
+        await this.ct.mediaListing.refreshEntry(mediaId);
     }
 };
 
-const activate = async (downloadedFile, targetFolder, mediaName, lang) => {
+const basenameWithoutExtension = filepath => {
+    const basename = path.basename(filepath);
+    return basename.slice(0, -path.extname(basename).length);
+};
+const getAlreadyUsedSubs = async (self, mediaId, lang) => {
+    const status = await self.getStatus(mediaId);
+    return new Set(status && status[lang] ? status[lang].tested : []);
+};
+const getEpisodeSubs = async (self, lang, imdbId, mediaEntry) => {
+    const seasonInfo = self.ct.mediaInfo.getInfo(mediaEntry.parent);
+    const episodeInfo = self.ct.mediaInfo.getInfo(mediaEntry.id);
+    return self.ct.subsProvider.getEpisodeSubs(lang, imdbId, seasonInfo.number, episodeInfo.number, mediaEntry.filepath);
+};
+const activate = async (downloadedFile, targetFolder, baseFilename, lang) => {
     await Promise.all([
-        fse.unlink(`${targetFolder}/${mediaName}.srt`).catch(ignoreENOENT),
-        fse.unlink(`${targetFolder}/${mediaName}.sub`).catch(ignoreENOENT),
-        fse.unlink(`${targetFolder}/${mediaName}.${lang}.srt`).catch(ignoreENOENT),
-        fse.unlink(`${targetFolder}/${mediaName}.${lang}.sub`).catch(ignoreENOENT)
+        fse.unlink(`${targetFolder}/${baseFilename}.srt`).catch(ignoreFileNotFound),
+        fse.unlink(`${targetFolder}/${baseFilename}.sub`).catch(ignoreFileNotFound),
+        fse.unlink(`${targetFolder}/${baseFilename}.${lang}.srt`).catch(ignoreFileNotFound),
+        fse.unlink(`${targetFolder}/${baseFilename}.${lang}.sub`).catch(ignoreFileNotFound)
     ]);
-
-    await fse.rename(downloadedFile, `${targetFolder}/${mediaName}.${lang}.srt`);
+    const target = `${targetFolder}/${baseFilename}.${lang}.srt`;
+    await fse.rename(downloadedFile, target);
+    console.log(`Subs INFO: Subtitle '${target} written'`);
 };
 
-const ignoreENOENT = error => {
+const ignoreFileNotFound = error => {
     if (error.code !== "ENOENT") throw error;
 };
 
-const updateStatus = async (self, subId, imdbId, lang) => {
-    let value = await self.ct.data.readValueFromFile(subsStatusDataFile, imdbId);
+const updateStatus = async (self, subId, mediaId, lang, availableSubsCount) => {
+    let value = await self.ct.data.readValueInFile(subsStatusDataFile, mediaId);
     if (!value) value = {};
-    value[lang] = { active: subId, tested: (value[lang] ? value[lang].tested : []) };
+    value[lang] = { active: subId, available: availableSubsCount, tested: (value[lang] ? value[lang].tested : []) };
     if (!value[lang].tested.includes(subId)) {
         value[lang].tested = value[lang].tested.concat(subId).sort();
     }
-    await self.ct.data.setValueInFile(subsStatusDataFile, imdbId, value);
+    await self.ct.data.setValueInFile(subsStatusDataFile, mediaId, value);
 };
 
 // const makeKey = (imdbId, lang, season, episode) => {

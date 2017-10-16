@@ -26,6 +26,8 @@ export default function Navigation(props) {
                             activeMediaEntry={props.navigation.activeMediaEntry}
                             mediaEntries={mediaEntries}
                             onClick={props.onMediaEntryClick}
+                            openEntries={props.navigation.openEntries}
+                            key={mediaType}
                         />
                     </Tab>
                 ))}

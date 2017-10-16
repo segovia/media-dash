@@ -17,7 +17,16 @@ module.exports = class Persistence {
             await fse.mkdir(this.dir);
             console.log(`Persistence INFO: Persistence directory created: ${this.dir}`);
         } catch (e) {
-            if (e.code !== "EEXIST") throw e;
+            if (e.code !== "EEXIST") throw e; // ignore if it already existed.
+        }
+    }
+
+    async deleteDir() {
+        try {
+            await fse.remove(this.dir);
+            console.log(`Persistence INFO: Persistence directory removed: ${this.dir}`);
+        } catch (e) {
+            if (e.code !== "ENOENT") throw e; // ignore if it didnt exist
         }
     }
 
@@ -55,14 +64,15 @@ module.exports = class Persistence {
         console.log(`Persistence INFO: File '${filePath}' written`);
     }
 
-    async readValueFromFile(filename, key) {
+    async readValueInFile(filename, key) {
         const cache = await this.readFile(filename);
         if (cache) return cache[key];
         return null;
     }
 
     async readOrCreateValueInFile(filename, key, initialValue) {
-        const cache = await this.readOrCreateFile(filename, () => ({}));
+        let cache = await this.readFile(filename);
+        if (!cache) cache = {};
         const cached = cache[key];
         if (cached) return cached;
         const newValue = await initialValue();
@@ -72,8 +82,19 @@ module.exports = class Persistence {
     }
 
     async setValueInFile(filename, key, value) {
-        const cache = await this.readOrCreateFile(filename, () => ({}));
+        let cache = await this.readFile(filename);
+        if (!cache) cache = {};
         cache[key] = value;
         this.persistFile(filename, cache);
+    }
+
+    async clearFiles() {
+        this.clearMemory();
+        await this.deleteDir();
+        await this.init();
+    }
+
+    clearMemory() {
+        this.files = {};
     }
 };

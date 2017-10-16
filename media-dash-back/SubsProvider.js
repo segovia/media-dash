@@ -6,22 +6,31 @@ const getSubs = async (self, args) => {
         console.log("Cannot connect to opensubtitles, credentials are not valid");
         return;
     }
-    return (await self.ct.cache.readOrCreateValueInFile(
+    return self.ct.cache.readOrCreateValueInFile(
         osSubsCacheFile,
         Object.values(args).join("___"),
-        async () => ({
-            searchArgs: args,
-            results: Object.values(await searchForSubs(self, Object.assign({}, args)))[0]
-        }))).results;
+        async () => searchForSubs(self, Object.assign({}, args)));
 };
 
-const searchForSubs = (self, params) => {
+const searchForSubs = async (self, params) => {
     try {
-        return self.os.search(params);
+        const result = await self.os.search(params);
+        const subs = uniqueSubs(Object.values(result)[0]);
+        return subs.map(s => ({ id: s.id, url: s.url }));
     } catch (e) {
         console.log(`Error requesting subtitles: ${e}`);
+        throw e;
     }
-    return Promise.resolve({});
+};
+
+const uniqueSubs = (subs) => {
+    const seenIds = new Set();
+    return subs
+        .filter(s => {
+            if (seenIds.has(s.id)) return false;
+            seenIds.add(s.id);
+            return true;
+        });
 };
 
 module.exports = class SubsProvider {
@@ -58,23 +67,23 @@ module.exports = class SubsProvider {
         return this.credentials && this.credentials.useragent && this.credentials.username && this.credentials.password;
     }
 
-    getMovieSubs(imdbId, language) {
+    getMovieSubs(language, imdbId, filepath) {
         return getSubs(this, {
             imdbid: imdbId,
             sublanguageid: language,
-            // path: "/home/gustavo/workspace/torrent-dash/back/test/Media/TV Shows/Game of Thrones/Season 06/Game of Thrones - S06E10 - The Winds of Winter.mp4",
-            limit: 10
+            path: this.ct.mediaListing.getAbsoluteMediaPath(filepath),
+            limit: 30
         });
     }
 
-    getTVShowEpisodeSubs(imdbId, season, episode, language) {
+    getEpisodeSubs(language, imdbId, season, episode, filepath) {
         return getSubs(this, {
             imdbid: imdbId,
             season: season,
             episode: episode,
             sublanguageid: language,
-            // path: "/home/gustavo/workspace/torrent-dash/back/test/Media/TV Shows/Game of Thrones/Season 06/Game of Thrones - S06E10 - The Winds of Winter.mp4",
-            limit: 10
+            path: this.ct.mediaListing.getAbsoluteMediaPath(filepath),
+            limit: 30
         });
     }
 
@@ -84,7 +93,7 @@ module.exports = class SubsProvider {
         for (let i = 0; i < cachedSearches.length; i++) {
             const result = cachedSearches[i].results.find(r => r.id === subId);
             if (result) {
-                return {searchArgs: cachedSearches[i].searchArgs, result: result};
+                return { searchArgs: cachedSearches[i].searchArgs, result: result };
             }
         }
         return null;

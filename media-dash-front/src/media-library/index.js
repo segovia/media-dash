@@ -3,13 +3,15 @@ import Immutable from 'seamless-immutable'
 import ContentPanel from './ContentPanel';
 import Navigation from './Navigation';
 import './index.css'
+import LoadingSpinner from '../LoadingSpinner';
 import MediaService from '../MediaService';
 import MediaType from '../MediaType';
+
 export default class MediaLibrary extends Component {
 
     constructor(props) {
         super(props)
-        this.state = Immutable({ navigation: { activeMediaType: MediaType.MOVIE } });
+        this.state = Immutable({ navigation: { activeMediaType: MediaType.MOVIE, openEntries: [] } });
     }
 
     componentWillMount = () => {
@@ -17,9 +19,20 @@ export default class MediaLibrary extends Component {
     }
 
     refreshMediaListing = async () => {
-        return MediaService.mediaListing().then(mediaListing => this.setState({
-            navigation: this.state.navigation.set('mediaListing', mediaListing)
-        }));
+        return MediaService.mediaListing().then(mediaListing => {
+            let newNavigation = this.state.navigation.set('mediaListing', mediaListing);
+            if (this.state.navigation.activeMediaEntry) {
+                let newActiveMediaEntry = findMediaEntryInListing(mediaListing, this.state.navigation.activeMediaEntry.id);
+                newNavigation = this.state.navigation.set('activeMediaEntry', newActiveMediaEntry);
+            }
+            this.setState({ navigation: newNavigation });
+            if (this.state.mediaInfo && this.state.mediaInfo.id) {
+                let newMediaEntry = findMediaEntryInListing(mediaListing, this.state.mediaInfo.id);
+                this.setState({
+                    mediaInfo: this.state.mediaInfo.merge(newMediaEntry)
+                });
+            }
+        });
     }
 
     onTabSelect = (newActiveMediaType) => {
@@ -27,57 +40,90 @@ export default class MediaLibrary extends Component {
     }
 
     onMediaEntryClick = async (mediaEntry) => {
+        const newNavigation = this.state.navigation.set('activeMediaEntry', mediaEntry);
         this.setState({
-            navigation:
-            this.state.navigation.set('activeMediaEntry', {
-                id: mediaEntry.id,
-                mediaType: mediaEntry.mediaType
-            }),
+            navigation: newNavigation,
             mediaInfo: Immutable(mediaEntry)
         });
 
-        return this.loadMediaInfo(mediaEntry.imdbId, mediaEntry.mediaType);
-    }
+        if (mediaEntry.children) {
+            const openEntries = newNavigation.openEntries;
+            const newOpenEntries = openEntries.includes(mediaEntry.id) ?
+                openEntries.filter(id => id !== mediaEntry.id) :
+                openEntries.concat(mediaEntry.id);
 
-    loadMediaInfo(imdbId, mediaType, forceUpdate) {
-        MediaService.mediaInfo(imdbId, mediaType, forceUpdate)
-            .then(info => { this.setState({ mediaInfo: this.state.mediaInfo.merge(info) }) });
-        if (mediaType === MediaType.MOVIE) {
-            MediaService.movieSubs(imdbId, 'eng')
-                .then(subs => {
-                    // make sure that the subs received match the current entry
-                    if (imdbId !== this.state.mediaInfo.imdbId) return;
-                    this.setState({ mediaInfo: this.state.mediaInfo.set('subs', subs) });
-                })
-                .catch(e => {
-                    console.log(e.stack);
-                    this.setState({ mediaInfo: this.state.mediaInfo.set('subsError', e.stack) });
-                });
+            this.setState({ navigation: newNavigation.set('openEntries', newOpenEntries) });
         }
+
+        return this.loadMediaInfo(mediaEntry.id);
     }
 
-    onInstallSub = async (subId) => {
-        await MediaService.installSub(subId);
-        this.refresh();
+    loadMediaInfo(mediaId, forceUpdate) {
+        MediaService.mediaInfo(mediaId, forceUpdate)
+            .then(info => { this.setState({ mediaInfo: this.state.mediaInfo.merge(info) }) })
+            .catch(error => { this.setState({ mediaInfo: { type: MediaType.NOT_FOUND, error: error.stack } }) });
     }
 
-    refresh() {
-        this.refreshMediaListing();
-        if (this.state.mediaInfo && this.state.mediaInfo.imdbId) {
-            this.loadMediaInfo(this.state.mediaInfo.imdbId, this.state.mediaInfo.mediaType, true);
+    onTryAnotherSub = async (mediaId, lang) => {
+        try {
+            this.setState({ mediaInfo: this.state.mediaInfo.merge({ subsError: "", subsLoading: true }) });
+            await MediaService.tryAnotherSub(mediaId, lang);
+        } catch (e) {
+            this.setState({ mediaInfo: this.state.mediaInfo.merge({ subsError: e.stack }) });
         }
+        await this.refresh(mediaId);
+        this.setState({ mediaInfo: this.state.mediaInfo.merge({ subsLoading: false }) });
+    }
+
+    onResetTestedSub = async (mediaId, lang) => {
+        try {
+            this.setState({ mediaInfo: this.state.mediaInfo.merge({ subsError: "", subsLoading: true }) });
+            await MediaService.resetTestedSub(mediaId, lang);
+        } catch (e) {
+            this.setState({ mediaInfo: this.state.mediaInfo.merge({ subsError: e.stack }) });
+        }
+        await this.refresh(mediaId);
+        this.setState({ mediaInfo: this.state.mediaInfo.merge({ subsLoading: false }) });
+    }
+
+    async refresh(mediaId) {
+        await this.refreshMediaListing();
+        if (mediaId) await this.loadMediaInfo(mediaId, true);
     }
 
     render() {
-        if (!this.state.navigation.mediaListing) return <div className="MediaLibrary"><br /> Loading...</div>;
+        if (!this.state.navigation.mediaListing) return <div className="MediaLibrary"><LoadingSpinner /></div>;
         return (
             <div className="MediaLibrary">
                 <Navigation
                     navigation={this.state.navigation}
                     onTabSelect={this.onTabSelect}
                     onMediaEntryClick={this.onMediaEntryClick} />
-                <ContentPanel mediaInfo={this.state.mediaInfo} onInstallSub={this.onInstallSub} />
+                <ContentPanel
+                    mediaInfo={this.state.mediaInfo}
+                    onTryAnotherSub={this.onTryAnotherSub}
+                    onResetTestedSub={this.onResetTestedSub} />
             </div>
         );
     }
+}
+
+const findMediaEntryInListing = (listing, id) => {
+    let entry;
+    const mediaTypes = Object.keys(listing);
+    for (let type of mediaTypes) {
+        entry = findMediaEntryInListingDFS(listing[type], id);
+        if (entry) break;
+    }
+    return entry;
+}
+
+const findMediaEntryInListingDFS = (listing, id) => {
+    for (let entry of listing) {
+        if (entry.id === id) return entry;
+        if (!entry.children) continue;
+        const result = findMediaEntryInListingDFS(entry.children, id);
+        if (result) return result;
+    }
+    return null;
 }

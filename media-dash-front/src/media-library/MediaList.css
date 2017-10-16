@@ -11,3 +11,10 @@
 .MediaLibrary-MediaList::-webkit-scrollbar-thumb {
     background: #515151;
 }
+.MediaLibrary-MediaList-folder-indicator {
+    margin-right: 8px;
+}
+.MediaLibrary-MediaList-item.expanded .MediaLibrary-MediaList-folder-indicator {
+    transform: rotate(45deg);
+    transform-origin: 35% 75%;
+}

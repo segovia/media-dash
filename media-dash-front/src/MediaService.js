@@ -16,39 +16,35 @@ class FetchError extends Error {
     }
 }
 
-async function mediaListing() {
-    const response = await fetchThrow('/media-listing');
+const mediaListing = async () => {
+    const response = await fetchThrow('/listing');
     return transformMediaListing(await response.json());
 };
 
-function transformMediaListing(original) {
-    return Immutable({
-        [MediaType.MOVIE]: transformMediaListingForType(original, MediaType.MOVIE),
-        [MediaType.TV]: transformMediaListingForType(original, MediaType.TV)
+const transformMediaListing = (original) => {
+    const newListing = { [MediaType.MOVIE]: [], [MediaType.TV]: [] };
+    Object.entries(original).forEach(e => {
+        e[1].id = e[0];
+        getContainer(original, newListing, e[1]).push(e[1]);
     });
+
+    return Immutable(newListing);
 }
 
-function transformMediaListingForType(mediaListing, mediaType) {
-    const folder = mediaListing[mediaType].children;
-    return Object.keys(folder).map((fileName, index) => ({
-        id: fileName,
-        title: (mediaType === MediaType.TV ? fileName : removeYearFromTitle(fileName)),
-        imdbId: folder[fileName].imdbId,
-        mediaType,
-        subLangs: folder[fileName].subLangs,
-        active: false
-    }));
+const getContainer = (original, newListing, entry) => {
+    if (entry.type === MediaType.EPISODE || entry.type === MediaType.SEASON) {
+        const parent = original[entry.parentId];
+        if (!parent.children) parent.children = [];
+        return parent.children;
+    }
+    return newListing[entry.type];
 }
 
-function removeYearFromTitle(title) {
-    return title.slice(0, title.length - 7);
-}
-
-const mediaInfo = async (imdbId, mediaType, forceUpdate) => {
+const mediaInfo = async (id, forceUpdate) => {
     return cacheInMemory(
         'mediaInfo',
-        imdbId,
-        async () => (await fetchThrow(`/${mediaType === MediaType.TV ? 'tv' : 'movie'}/${imdbId}`)).json(),
+        id,
+        async () => (await fetchThrow(`/info/${id}`)).json(),
         forceUpdate);
 };
 
@@ -61,6 +57,8 @@ const tvShowSubs = async (imdbId, season, episode, language) => {
     return cacheInMemory('tvShowSubs', [imdbId, season, episode, language],
         async () => await fetchSubs(`/tv/${imdbId}/${season}/${episode}/subs/${language}`));
 };
+
+const clearCache = async () => fetchThrow('/clear-cache');
 
 const fetchSubs = async (url) => (await fetchThrow(url)).json();
 
@@ -78,6 +76,8 @@ const cacheInMemory = async (cacheName, key, update, forceUpdate) => {
     return value;
 }
 
-const installSub = async (subId) => (await fetchThrow(`/subs/install/${subId}`)).text();
+// const installSub = async (subId) => (await fetchThrow(`/subs/install/${subId}`)).text();
+const tryAnotherSub = async (mediaId, lang) => (await fetchThrow(`/subs/${mediaId}/try-another/${lang}`)).text();
+const resetTestedSub = async (mediaId, lang) => (await fetchThrow(`/subs/${mediaId}/reset-tested/${lang}`)).text();
 
-export default { mediaListing, mediaInfo, movieSubs, tvShowSubs, installSub }
+export default { mediaListing, mediaInfo, movieSubs, tvShowSubs, tryAnotherSub, resetTestedSub, clearCache }

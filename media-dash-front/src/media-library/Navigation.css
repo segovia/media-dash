@@ -1,6 +1,7 @@
 .MediaLibrary-Navigation {
     flex: 0 0 400px;
     background-color: #252526;
+    position: relative;
 }
 
 .MediaLibrary-Navigation .nav-tabs {

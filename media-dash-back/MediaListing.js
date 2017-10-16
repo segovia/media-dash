@@ -1,127 +1,202 @@
+const path = require("path");
+const { promisify } = require("util");
+const glob = promisify(require("glob"));
+const fse = require("fs-extra");
+const without = require("seamless-immutable").without;
 const MEDIA_TYPE = require("./MediaType");
-const Immutable = require("seamless-immutable");
+const IGNORED_EXTENSIONS = "!(*.idx|*.jpg|*.smi|*.nfo)";
 
-const titleToImdbIdMapCacheFile = "imdb-ids.json";
+const cacheFile = "media-listing.json";
 
-module.exports = class MediaListing {
+class MediaListing {
     constructor(ct) {
         ct.mediaListing = this;
         this.ct = ct;
+        this.parentToChildrenMap = {};
     }
-
     async init() {
-        await this.refresh();
+        const listing = await this.get();
+        refreshParentToChildrenMap(this, listing);
+    }
+    async get() {
+        return this.ct.cache.readOrCreateFile(
+            cacheFile,
+            async () => await scanForMediaFiles(this, this.ct.props.mediaDir));
+    }
+    async getFiltered() {
+        const listing = await this.get();
+        return Object.entries(listing).reduce((map, e) => {
+            map[e[0]] = without(e[1], "filepath");
+            return map;
+        }, {});
     }
 
-    async refresh() {
-        try {
-            const start = new Date();
-            const titleToImdbIdMap = await loadTitleToImdbIdMap(this.ct);
-            const fileListing = await this.ct.fileListing.get();
-            this.listing = await buildMediaListing(fileListing, titleToImdbIdMap);
-            await requestAndFillInMissingImdbIds(this.ct, this.listing, titleToImdbIdMap);
-            console.log(`MediaListing INFO: Listing refreshed in ${new Date() - start}ms`);
-        } catch (e) {
-            console.log(e);
-        }
+    getAbsoluteMediaPath(relativePath) {
+        return `${this.ct.props.mediaDir}/${relativePath}`;
     }
 
-    async refreshMedia(mediaType, mediaName) {
-        await this.ct.fileListing.refresh(mediaType, mediaName);
-        await this.refresh();
+    async refreshEntry(id) {
+        // the only thing that makes sense to refresh is an entries subtitles
+        const mediaDir = this.ct.props.mediaDir;
+        const entry = await this.getEntry(id);
+        const subFiles = await glob(`${mediaDir}/${path.dirname(entry.filepath)}/@(*.srt|*.sub)`, { nodir: true });
+        const relativeSubFiles = subFiles.map(filepath => filepath.substring(mediaDir.length + 1));
+        const listing = await this.get();
+        listing[id].subLangs = [];
+        await addSubtitleInfoToListing(this, relativeSubFiles, listing);
+        this.ct.cache.persistFile(cacheFile, listing);
     }
 
-    get() {
-        return this.listing;
+    async getEntry(id) {
+        return (await this.get())[id];
     }
 
-    getEntry(imdbId) {
-        // not optimal runtime, imdbId to title could be precomputed if perfomance is bad
-        const listingsVals = Object.values(this.listing);
-        for (let i = 0; i < listingsVals.length; i++) {
-            const found = Object.entries(listingsVals[i].children).find(([k, v]) => { //eslint-disable-line no-unused-vars
-                return v.imdbId === imdbId;
-            });
-            if (found) return Object.assign({}, found[1], {name: found[0]});
-        }
-        return "not found";
+    getChildrenIds(parentId) {
+        return this.parentToChildrenMap[parentId];
     }
+}
+
+MediaListing.DEFAULT_SUB_LANG = "default";
+module.exports = MediaListing;
+
+const scanForMediaFiles = async (self, mediaDir) => {
+    console.log("MediaListing INFO: Scanning media files");
+    const start = new Date();
+    const files = await glob(
+        `${mediaDir}/@(${MEDIA_TYPE.TV}|${MEDIA_TYPE.MOVIE})/**/${IGNORED_EXTENSIONS}`,
+        { nodir: true });
+    const relativeFiles = files.map(filepath => filepath.substring(mediaDir.length + 1));
+    const listing = relativeFiles.filter(filepath => !isSubtitleFile(filepath)).reduce(handleFileEntry, {});
+    await addSubtitleInfoToListing(self, relativeFiles, listing);
+    console.log(`MediaListing INFO: Files scanned, ${files.length} files found and processed in ${new Date() - start}ms`);
+    return listing;
 };
 
-
-const loadTitleToImdbIdMap = async (ct) => {
-    return ct.cache.readOrCreateFile(
-        titleToImdbIdMapCacheFile,
-        () => ({ [MEDIA_TYPE.MOVIE]: {}, [MEDIA_TYPE.TV]: {} }));
+const isSubtitleFile = filename => filename.endsWith(".sub") || filename.endsWith(".srt");
+const refreshParentToChildrenMap = (self, listing) => {
+    self.parentToChildrenMap = Object.entries(listing).filter(e => e[1].parentId).reduce((map, e) => {
+        if (!map[e[1].parentId]) map[e[1].parentId] = [];
+        map[e[1].parentId].push(e[0]);
+        return map;
+    }, {});
 };
 
-const requestAndFillInMissingImdbIds = async (ct, mediaListing, imdbIds) => {
-    const titlesMissingImdbId = getTitlesWithoutImdbId(mediaListing);
-    if (titlesMissingImdbId.length === 0) return;
-    // tmdb only allows 30 req per 10s, each imdb id needs 2 requests, so we can
-    // only get 15 imdb ids per 10s.
-    const batchSize = 15;
-    const sleepTime = 10000;
-    for (let i = 0; i < titlesMissingImdbId.length; i += batchSize) {
-        console.log();
-        let batch = titlesMissingImdbId.slice(i, i + batchSize);
-        await updateBatch(ct, mediaListing, imdbIds, batch);
-        if (batch.length === batchSize) {
-            console.log(`\nWaiting ${sleepTime / 1000}s to start next batch...`);
-            await sleep(sleepTime);
-        }
-    }
-    console.log();
+const handleFileEntry = (listing, filepath) => {
+    const firstSlashIdx = filepath.indexOf("/");
+    const mediaType = filepath.slice(0, firstSlashIdx);
+    mediaType === MEDIA_TYPE.MOVIE ?
+        handleMovieEntry(listing, filepath, firstSlashIdx + 1) :
+        handleTVShowEntry(listing, filepath, firstSlashIdx + 1);
+    return listing;
 };
 
-const updateBatch = async (ct, mediaListing, imdbIds, batch) => {
-    const promises = batch.map(async (entry) => {
-        const imdbId = await ct.mediaInfo.getImdbId(entry.title, entry.type);
-        console.log(`Media INFO: imdb id retrieved for ${entry.title} -> ${imdbId}`);
-        if (imdbId != undefined) {
-            mediaListing[entry.type].children[entry.title].imdbId = imdbId;
-            imdbIds[entry.type][entry.title] = imdbId;
-        }
+const handleMovieEntry = (listing, filepath, startIdx) => {
+    const slashIdx = filepath.indexOf("/", startIdx);
+    const movieFolder = filepath.slice(startIdx, slashIdx);
+    const id = extractMovieId(movieFolder);
+    if (listing[id]) return listing[id];
+    listing[id] = {
+        type: MEDIA_TYPE.MOVIE,
+        filepath: filepath,
+        title: extractMovieTitle(movieFolder),
+        subLangs: []
+    };
+};
+const extractMovieId = movieFolder => extractMovieTitle(movieFolder).toLowerCase().replace(/ /g, "_") +
+    "." + extractMovieYear(movieFolder);
+const extractMovieTitle = movieFolder => movieFolder.slice(0, -7);
+const extractMovieYear = movieFolder => movieFolder.slice(-5, -1);
+
+const handleTVShowEntry = (listing, filepath, startIdx) => {
+    const slashIdx = filepath.indexOf("/", startIdx);
+    const tvShowFolder = filepath.slice(startIdx, slashIdx);
+    const tvShowId = extractTVShowId(tvShowFolder);
+    ensureTVShowEntryDetailsIsCreated(listing, filepath, tvShowFolder, tvShowId);
+    handleSeasonEntry(listing, filepath, slashIdx + 1, tvShowId);
+    return listing;
+};
+const ensureTVShowEntryDetailsIsCreated = (listing, filepath, tvShowFolder, tvShowId) => {
+    if (listing[tvShowId]) return;
+    listing[tvShowId] = {
+        type: MEDIA_TYPE.TV,
+        filepath: filepath,
+        title: tvShowFolder
+    };
+};
+const extractTVShowId = tvShowFolder => tvShowFolder.toLowerCase().replace(/ /g, "_");
+
+const handleSeasonEntry = (listing, filepath, startIdx, tvShowId) => {
+    const slashIdx = filepath.indexOf("/", startIdx);
+    const seasonFolder = filepath.slice(startIdx, slashIdx);
+    if (!seasonFolder.startsWith("Season ")) return;
+    const seasonId = extractSeasonId(seasonFolder, tvShowId);
+    ensureSeasonEntryDetailsIsCreated(listing, filepath, seasonFolder, seasonId, tvShowId);
+    handleEpisodeEntry(listing, filepath, slashIdx + 1, seasonId);
+    return listing;
+};
+const ensureSeasonEntryDetailsIsCreated = (listing, filepath, seasonFolder, seasonId, tvShowId) => {
+    if (listing[seasonId]) return;
+    listing[seasonId] = {
+        type: MEDIA_TYPE.SEASON,
+        filepath: filepath,
+        title: seasonFolder,
+        parentId: tvShowId,
+        number: parseInt(extractSeasonNumber(seasonFolder))
+    };
+};
+const extractSeasonId = (seasonFolder, tvShowId) => `${tvShowId}.s${extractSeasonNumber(seasonFolder)}`;
+const extractSeasonNumber = seasonFolder => seasonFolder.slice(-2);
+
+const handleEpisodeEntry = (listing, filepath, startIdx, seasonId) => {
+    const episodeFile = filepath.slice(startIdx);
+    const id = extractEpisodeId(listing, episodeFile, seasonId);
+    if (listing[id]) return listing[id];
+    listing[id] = {
+        type: MEDIA_TYPE.EPISODE,
+        filepath: filepath,
+        title: extractEpisodeTitle(episodeFile, listing[seasonId]),
+        number: parseInt(extractEpisodeNumber(episodeFile, listing[seasonId])),
+        parentId: seasonId,
+        subLangs: []
+    };
+};
+const extractEpisodeId = (listing, episodeFile, seasonId) => `${seasonId}.e${extractEpisodeNumber(episodeFile, listing[seasonId])}`;
+const extractEpisodeNumber = (episodeFile, season) => {
+    const idxOfEpisodeNumber = episodeFile.indexOf(` - S${padSeasonNumber(season)}E`) + 7;
+    return episodeFile.substr(idxOfEpisodeNumber, 2);
+};
+const extractEpisodeTitle = (episodeFile, season) => {
+    const index = episodeFile.indexOf(` - S${padSeasonNumber(season)}E`) + 7;
+    const secondIndex = episodeFile.indexOf(" - ", index) + 3;
+    return removeExtension(episodeFile.slice(secondIndex));
+};
+const removeExtension = filename => filename.slice(-8, -7) === "." ? filename.slice(0, -8) : filename.slice(0, -4);
+const padSeasonNumber = season => `0${season.number}`.slice(-2);
+
+const addSubtitleInfoToListing = async (self, filepaths, listing) => {
+    const filepathToDetailsMap = Object.values(listing)
+        .reduce((map, details) => {
+            map[removeExtension(details.filepath)] = details;
+            return map;
+        }, {});
+    const subs = filepaths.filter(isSubtitleFile);
+    await Promise.all(subs.map(async sub => {
+        const details = filepathToDetailsMap[removeExtension(sub)];
+        if (!details) return;
+        const subLang = extractSubtitleLang(sub);
+        const birthtime = (await fse.stat(self.getAbsoluteMediaPath(sub))).birthtime;
+        if (!details.subLangs.includes(subLang)) details.subLangs.push({ lang: subLang, addedOn: birthtime });
+    }));
+    Object.values(listing).forEach(v => {
+        if (v.subLangs) v.subLangs.sort((a, b) => orderIndex(a.lang) - orderIndex(b.lang));
     });
-    await Promise.all(promises);
-    await saveImdbIds(ct, imdbIds);
-};
-
-const buildMediaListing = async (fileListing, imdbIds) => {
-    const mediaListing = Immutable.asMutable(fileListing, { deep: true });
-    processSubtitleInfoForMovies(mediaListing);
-    mergeMediaInfoByType(mediaListing, imdbIds, MEDIA_TYPE.MOVIE);
-    mergeMediaInfoByType(mediaListing, imdbIds, MEDIA_TYPE.TV);
-    return mediaListing;
-};
-
-const processSubtitleInfoForMovies = (mediaListing) => {
-    const movies = mediaListing[MEDIA_TYPE.MOVIE].children;
-    Object.entries(movies).forEach(([movieName, movieEntry]) => {
-        movieEntry.subLangs = generateSubLangsString(movieName, movieEntry);
-    });
-};
-
-const generateSubLangsString = (movieName, movieEntry) => {
-    const subtitles = Object.keys(movieEntry.children).filter(filename =>
-        filename.startsWith(`${movieName}.`) &&
-        (filename.endsWith(".srt") || filename.endsWith(".sub")));
-
-    return subtitles
-        .map(filename => {
-            const lang = filename.substr(-8, 4);
-            return lang.charAt(0) === "." ? lang.substr(-3) : "default";
-        })
-        .sort((a, b) => orderIndex(a) - orderIndex(b))
-        .filter((lang, idx, langs) => !idx || lang != langs[idx - 1]); // remove dups
 };
 
 const orderIndex = lang => {
     switch (lang) {
-        case "default": return 0;
-        case "eng": return 1;
-        case "cze": return 2;
-        case "ger": return 3;
+        case "eng": return 0;
+        case "cze": return 1;
+        case "ger": return 2;
     }
     return toNumber(lang);
 };
@@ -137,28 +212,4 @@ const toNumber = (lang) => {
     return val;
 };
 
-const mergeMediaInfoByType = (mediaListing, imdbIds, mediaType) => {
-    const listing = mediaListing[mediaType].children;
-    const imdbIdMap = imdbIds[mediaType];
-    Object.keys(imdbIdMap).forEach(title => listing[title].imdbId = imdbIdMap[title]);
-};
-
-const getTitlesWithoutImdbId = (mediaListing) => {
-    const fromMovies = getTitlesWithNoImdbId(mediaListing[MEDIA_TYPE.MOVIE].children);
-    const fromTVShows = getTitlesWithNoImdbId(mediaListing[MEDIA_TYPE.TV].children);
-    const result = fromMovies.map(t => ({ type: MEDIA_TYPE.MOVIE, title: t }));
-    return result.concat(fromTVShows.map(t => ({ type: MEDIA_TYPE.TV, title: t })));
-};
-
-const getTitlesWithNoImdbId = (listing) => {
-    return Object.keys(listing).filter(title => listing[title].imdbId === undefined);
-};
-
-const sleep = (ms) => {
-    return new Promise(resolve => setTimeout(resolve, ms));
-};
-
-const saveImdbIds = async (ct, imdbIds) => {
-    await ct.cache.persistFile(titleToImdbIdMapCacheFile, imdbIds);
-};
-
+const extractSubtitleLang = filename => filename.slice(-8, -7) === "." ? filename.slice(-7, -4) : MediaListing.DEFAULT_SUB_LANG;
