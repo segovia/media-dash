@@ -30,24 +30,32 @@ const mediaInfo = (state = null, action, mediaListing) => {
     switch (action.type) {
         case 'REQUEST_MEDIA_INFO':
             if (!state || state.id !== action.mediaId) {
-                return Object.assign({}, { id: action.mediaId, type: mediaListing[action.mediaId].type, loading: true });
+                return Object.assign({}, { id: action.mediaId, type: mediaListing[action.mediaId].type, loading: true, error: null });
             }
             break;
         case 'RECEIVE_MEDIA_INFO_SUCCESS':
             if (state.id === action.mediaInfo.id) {
-                return Object.assign({}, state, action.mediaInfo, { loading: false });
+                return Object.assign({}, state, action.mediaInfo);
             }
             break;
         case 'RECEIVE_MEDIA_INFO_FAILURE':
-            return { type: MediaType.NOT_FOUND, error: action.error.stack };
+            if (state.id === action.mediaId) {
+                return Object.assign({}, state, { error: { type: 'not_found', message: action.error.stack } });
+            }
+            break;
+        case 'RECEIVE_MEDIA_INFO_FINALLY':
+            if (state.id === action.mediaId) {
+                return Object.assign({}, state, { loading: false });
+            }
+            break;
         case 'REQUEST_SUB':
             if (state.id === action.mediaId) {
-                return Object.assign({}, state, { subsLoading: true, subsError: '' });
+                return Object.assign({}, state, { subsLoading: true, error: null });
             }
             break;
         case 'RECEIVE_SUB_FAILURE':
             if (state.id === action.mediaId) {
-                return Object.assign({}, state, { subsError: action.subsError });
+                return Object.assign({}, state, { error: { type: 'subs', message: action.error.stack } });
             }
             break;
         case 'RECEIVE_SUB_FINALLY':

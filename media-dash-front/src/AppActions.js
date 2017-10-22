@@ -17,7 +17,8 @@ export const requestMediaInfo = (mediaId, forceUpdate) => {
         dispatch({ type: 'REQUEST_MEDIA_INFO', mediaId });
         return MediaService.mediaInfo(mediaId, forceUpdate)
             .then(info => dispatch(receiveMediaInfoSuccess(info)))
-            .catch(error => dispatch(receiveMediaInfoFailure(error)));
+            .catch(error => dispatch(receiveMediaInfoFailure(mediaId, error)))
+            .then(info => dispatch(receiveMediaInfoFinally(mediaId)));
     };
 };
 
@@ -26,9 +27,15 @@ export const receiveMediaInfoSuccess = mediaInfo => ({
     mediaInfo
 });
 
-export const receiveMediaInfoFailure = error => ({
+export const receiveMediaInfoFailure = (mediaId, error) => ({
     type: 'RECEIVE_MEDIA_INFO_FAILURE',
+    mediaId,
     error
+});
+
+export const receiveMediaInfoFinally = mediaId => ({
+    type: 'RECEIVE_MEDIA_INFO_FINALLY',
+    mediaId
 });
 
 export const requestMediaListing = () => {
@@ -55,7 +62,7 @@ const requestSub = (requester, mediaId, lang) => {
     return dispatch => {
         dispatch({ type: 'REQUEST_SUB', mediaId, lang });
         return requester(mediaId, lang)
-            .catch(e => dispatch({ type: 'RECEIVE_SUB_FAILURE', mediaId, subsError: e.stack }))
+            .catch(error => dispatch({ type: 'RECEIVE_SUB_FAILURE', mediaId, error }))
             .then(() => dispatch(refreshMedia(mediaId)))
             .then(e => dispatch({ type: 'RECEIVE_SUB_FINALLY', mediaId }));
     };

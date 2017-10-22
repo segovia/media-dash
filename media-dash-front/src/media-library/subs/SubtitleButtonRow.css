@@ -1,0 +1,10 @@
+.SubtitleButtonRow {
+    display: inline-block;
+    line-height: 130%;
+}
+
+.SubtitleButton {
+    margin: 0 0 0 6px;
+}
+
+

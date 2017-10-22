@@ -1,6 +1,5 @@
 import React, { PureComponent } from 'react';
 import PropTypes from 'prop-types';
-import './SubtitleButton.css';
 import { DropdownButton, MenuItem } from 'react-bootstrap';
 
 class NewSubtitleButton extends PureComponent {

@@ -55,8 +55,9 @@ const loadMovieInfo = async (self, listingEntry) => {
     const reqUrl = `${serviceUrl}/search/movie?api_key=${apiKey}&query=${encodeURIComponent(title)}&year=${year}`;
     const response = JSON.parse(await request(reqUrl));
 
-    const result = response.results[0];
+    const genreMap = await loadGenreMap(MEDIA_TYPE.MOVIE);
 
+    const result = response.results[0];
     await self.ct.cache.setValueInFile(extMediaInfoFile, listingEntry.id, {
         tmdbId: result.id,
         title: result.title,
@@ -65,7 +66,7 @@ const loadMovieInfo = async (self, listingEntry) => {
         overview: result.overview,
         releaseDate: result.release_date,
         voteScore: result.vote_average,
-        genreIds: result.genre_ids
+        genres: result.genre_ids.map(id => genreMap[id])
     });
 };
 
@@ -74,8 +75,9 @@ const loadTVShowInfo = async (self, listingEntry) => {
     const reqUrl = `${serviceUrl}/search/tv?api_key=${apiKey}&query=${encodeURIComponent(name)}`;
     const response = JSON.parse(await request(reqUrl));
 
-    const result = response.results[0];
+    const genreMap = await loadGenreMap(MEDIA_TYPE.TV);
 
+    const result = response.results[0];
     await self.ct.cache.setValueInFile(extMediaInfoFile, listingEntry.id, {
         tmdbId: result.id,
         title: result.name,
@@ -84,8 +86,17 @@ const loadTVShowInfo = async (self, listingEntry) => {
         overview: result.overview,
         firstAirDate: result.first_air_date,
         voteScore: result.vote_average,
-        genreIds: result.genre_ids
+        genres: result.genre_ids.map(id => genreMap[id])
     });
+};
+
+const loadGenreMap = async type => {
+    const reqUrl = `${serviceUrl}/genre/${MEDIA_TYPE.MOVIE === type ? "movie" : "tv"}/list?api_key=${apiKey}`;
+    const response = JSON.parse(await request(reqUrl));
+    return response.genres.reduce((map, entry) => {
+        map[entry.id] = entry.name;
+        return map;
+    }, {});
 };
 
 const loadSeasonsInfo = async (self, listingEntry) => {

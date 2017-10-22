@@ -45,7 +45,7 @@ module.exports = class Subs {
                 await this.ct.data.setValueInFile(subsStatusDataFile, mediaId, status);
             }
         }
-        await this.tryAnother(mediaId, "eng");
+        await this.tryAnother(mediaId, lang === MediaListing.DEFAULT_SUB_LANG ? "eng" : lang);
     }
 
     async install(mediaId, filepath, lang, sub, availableSubsCount) {
