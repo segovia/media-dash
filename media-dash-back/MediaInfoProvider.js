@@ -155,11 +155,8 @@ const loadImdbId = async (self, mediaEntry, info) => {
         imdbId = await getMovieImdbId(info.tmdbId);
     } else if (mediaEntry.type === MEDIA_TYPE.TV) {
         imdbId = await getTVShowImdbId(info.tmdbId);
-    } else if (mediaEntry.type === MEDIA_TYPE.TV) {
-        const season = await self.getInfo(info.parent);
-        imdbId = await getEpisodeImdbId(info.tmdbId, season.number, info.number);
     } else {
-        console.log(`Cannot get imdb id for media of type ${info.type}`);
+        console.log(`Cannot get imdb id for media of type ${info.type}. Media entry: ${mediaEntry}`);
     }
     return imdbId;
 };
@@ -170,8 +167,4 @@ const getMovieImdbId = async (tmdbId) => {
 
 const getTVShowImdbId = async (tmdbId) => {
     return JSON.parse(await request(`${serviceUrl}/tv/${tmdbId}/external_ids?api_key=${apiKey}`)).imdb_id;
-};
-
-const getEpisodeImdbId = async (tmdbId, season, episode) => {
-    return JSON.parse(await request(`${serviceUrl}/tv/${tmdbId}/season/${season}/episode/${episode}/external_ids?api_key=${apiKey}`)).imdb_id;
 };

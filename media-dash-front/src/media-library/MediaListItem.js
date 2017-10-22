@@ -2,35 +2,39 @@ import React, { PureComponent } from 'react';
 import PropTypes from 'prop-types';
 import { ListGroupItem, Glyphicon } from 'react-bootstrap';
 import './MediaList.css'
-import MediaType from '../MediaType';
 
-export default class MediaListItem extends PureComponent {
+class MediaListItem extends PureComponent {
     static propTypes = {
-        activeMediaEntry: PropTypes.object,
+        eventKey: PropTypes.string.isRequired,
+        active: PropTypes.bool.isRequired,
         indent: PropTypes.number.isRequired,
-        mediaEntry: PropTypes.object.isRequired,
         onClick: PropTypes.func.isRequired,
-        openEntries: PropTypes.array.isRequired
+        isParent: PropTypes.bool.isRequired,
+        expanded: PropTypes.bool,
+        children: PropTypes.array.isRequired
     };
+    handleClick = () => this.props.onClick(this.props.eventKey);
     render() {
-        const {mediaEntry, activeMediaEntry, indent, onClick, openEntries} = this.props;
+        const {active, indent, isParent, expanded} = this.props;
         const indentStr = Array(indent).fill('\u00A0\u00A0\u00A0\u00A0').join('');
         return (
             <ListGroupItem
-                active={activeMediaEntry && activeMediaEntry.id === mediaEntry.id}
-                onClick={() => onClick(mediaEntry)}
-                className={`MediaLibrary-MediaList-item ${openEntries.includes(mediaEntry.id) ? 'expanded' : ''}`}
+                active={active}
+                onClick={this.handleClick}
+                className={`MediaLibrary-MediaList-item ${expanded ? 'expanded' : ''}`}
             >
                 <span>
                     {indentStr}
-                    {mediaEntry.children ?
+                    {isParent ?
                         <Glyphicon className="MediaLibrary-MediaList-folder-indicator" glyph="triangle-right" />:
                         indent > 0 ? '\u00A0\u00A0' : ''
                     }
-                    {mediaEntry.type === MediaType.EPISODE && mediaEntry.number + " - "}
-                    {mediaEntry.title}
+                    {this.props.children}
+                    
                 </span>
             </ListGroupItem>
         );
     }
 }
+
+export default MediaListItem;

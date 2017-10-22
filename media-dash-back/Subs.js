@@ -23,10 +23,10 @@ module.exports = class Subs {
             console.log(`Subs ERROR: It is not possible to 'try another' sub for media of type ${mediaEntry.type}`);
             return;
         }
-        const imdbId = await this.ct.mediaInfo.getImdbId(mediaId);
+
         const subs = await (mediaEntry.type === MEDIA_TYPE.MOVIE ?
-            this.ct.subsProvider.getMovieSubs(lang, imdbId, mediaEntry.filepath) :
-            getEpisodeSubs(this, lang, imdbId, mediaEntry));
+            getMovieSubs(this,  mediaId, lang, mediaEntry.filepath) :
+            getEpisodeSubs(this,  mediaId, lang, mediaEntry.filepath, mediaEntry.parentId));
 
         const tested = await getAlreadyUsedSubs(this, mediaId, lang);
         let sub = subs.find(s => !tested.has(s.id));
@@ -68,10 +68,17 @@ const getAlreadyUsedSubs = async (self, mediaId, lang) => {
     const status = await self.getStatus(mediaId);
     return new Set(status && status[lang] ? status[lang].tested : []);
 };
-const getEpisodeSubs = async (self, lang, imdbId, mediaEntry) => {
-    const seasonInfo = self.ct.mediaInfo.getInfo(mediaEntry.parent);
-    const episodeInfo = self.ct.mediaInfo.getInfo(mediaEntry.id);
-    return self.ct.subsProvider.getEpisodeSubs(lang, imdbId, seasonInfo.number, episodeInfo.number, mediaEntry.filepath);
+const getMovieSubs = async (self, mediaId, lang, filepath) => {
+    const imdbId = await self.ct.mediaInfo.getImdbId(mediaId);
+    return self.ct.subsProvider.getMovieSubs(lang, imdbId, filepath);
+};
+const getEpisodeSubs = async (self, mediaId, lang, filepath, parentId) => {
+    const seasonId = parentId;
+    const seasonEntry = await self.ct.mediaListing.getEntry(seasonId);
+    const seasonInfo = await self.ct.mediaInfo.getInfo(seasonId);
+    const tvShowImdbId = await self.ct.mediaInfo.getImdbId(seasonEntry.parentId);
+    const episodeInfo = await self.ct.mediaInfo.getInfo(mediaId);
+    return self.ct.subsProvider.getEpisodeSubs(lang, tvShowImdbId, seasonInfo.number, episodeInfo.number, filepath);
 };
 const activate = async (downloadedFile, targetFolder, baseFilename, lang) => {
     await Promise.all([
@@ -82,7 +89,7 @@ const activate = async (downloadedFile, targetFolder, baseFilename, lang) => {
     ]);
     const target = `${targetFolder}/${baseFilename}.${lang}.srt`;
     await fse.rename(downloadedFile, target);
-    console.log(`Subs INFO: Subtitle '${target} written'`);
+    console.log(`Subs INFO: Subtitle '${target}' written`);
 };
 
 const ignoreFileNotFound = error => {

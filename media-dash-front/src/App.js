@@ -12,7 +12,7 @@ export default class App extends PureComponent {
 
     render() {
         return (
-            <div>
+            <div className="App">
                 <Navbar inverse fixedTop>
                     <Grid>
                         <Navbar.Header>

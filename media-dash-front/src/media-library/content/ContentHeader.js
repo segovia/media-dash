@@ -1,9 +1,15 @@
 import React, { PureComponent } from 'react';
 import PropTypes from 'prop-types';
-import { DropdownButton, MenuItem, Alert, Glyphicon } from 'react-bootstrap';
+import { Alert, Glyphicon } from 'react-bootstrap';
 import Immutable from 'seamless-immutable'
 import './ContentHeader.css'
 import LoadingSpinner from '../../LoadingSpinner';
+import SubtitleButton from './SubtitleButton';
+import NewSubtitleButton from './NewSubtitleButton';
+import { connect } from 'react-redux';
+import { tryAnotherSub, resetTestedSub } from '../../AppActions';
+
+
 
 const availableLangs = {
     eng: "English",
@@ -12,8 +18,9 @@ const availableLangs = {
     ger: "German"
 };
 
-export default class ContentHeader extends PureComponent {
+class ContentHeader extends PureComponent {
     static propTypes = {
+        mediaId: PropTypes.string.isRequired,
         title: PropTypes.string.isRequired,
         imagePath: PropTypes.string.isRequired,
         imageIsWide: PropTypes.bool,
@@ -30,8 +37,11 @@ export default class ContentHeader extends PureComponent {
         onResetTestedSub: PropTypes.func,
     };
 
+    handleTryAnotherSub = lang => this.props.onTryAnotherSub(this.props.mediaId, lang);
+    handleResetTestedSub = lang => this.props.onResetTestedSub(this.props.mediaId, lang);
+
     render() {
-        const { title, imagePath, imageIsWide, overview, subLangs, subsStatus, subsLoading, additionalInfo, onTryAnotherSub, onResetTestedSub } = this.props;
+        const { title, imagePath, imageIsWide, overview, subLangs, subsStatus, subsLoading, additionalInfo } = this.props;
         return (
             <div className="ContentHeader">
                 <h3>{title}</h3>
@@ -41,7 +51,7 @@ export default class ContentHeader extends PureComponent {
                 {additionalInfo && Object.entries(additionalInfo).map(e => (
                     <h4 key={e[0]}>{toWords(e[0])}: <span className="console">{toValue(e[1])}</span></h4>
                 ))}
-                {renderSubLangs(subLangs, subsStatus, subsLoading, onTryAnotherSub, onResetTestedSub)}
+                {renderSubLangs(subLangs, subsStatus, subsLoading, this.handleTryAnotherSub, this.handleResetTestedSub)}
                 {overview && [<h4 key="0">Overview: </h4>, <p key="1">{overview}</p>]}
                 {this.props.subsError && (
                     <Alert bsStyle="danger">
@@ -55,35 +65,40 @@ export default class ContentHeader extends PureComponent {
 
 const renderSubLangs = (subLangs, subsStatus, subsLoading, onTryAnotherSub, onResetTestedSub) => {
     if (!subLangs) return;
-    const newAvailableLangs = Object.keys(Immutable.without(availableLangs, subLangs.map(s => s.lang)));
+    const newAvailableLangs = Immutable.without(availableLangs, subLangs.map(s => s.lang));
     return subsLoading ?
         <h4>Subtitle languages: <LoadingSpinner /></h4> :
-        <h4>Subtitle languages: 
+        <h4>Subtitle languages:
         {subLangs.map(({ lang, addedOn }) => (
-                <DropdownButton key={lang} bsSize="xsmall" title={lang} id={`content-header-${lang}-subtitle`} pullRight>
-                    <MenuItem key="try-another-sub" eventKey={lang} onSelect={onTryAnotherSub}>Try another</MenuItem>
-                    <MenuItem key="reset-tested-sub" eventKey={lang} onSelect={onResetTestedSub}>Reset tested</MenuItem>
-                    {subsStatus && subsStatus[lang] && <MenuItem key="subs-used" header>
-                        {subsStatus[lang].tested.length} out of {subsStatus[lang].available} tested</MenuItem>}
-                    <MenuItem key="updated-on" header>Updated {formatAddedOnDate(addedOn)}</MenuItem>
-                </DropdownButton>
+                <SubtitleButton
+                    lang={lang}
+                    key={lang}
+                    addedOn={addedOn}
+                    subStatus={subsStatus && subsStatus[lang]}
+                    onTryAnotherSub={onTryAnotherSub}
+                    onResetTestedSub={onResetTestedSub}
+                />
             ))}
-            <DropdownButton disabled={newAvailableLangs.length === 0} key="new" bsSize="xsmall" bsStyle="info" title="new" id="content-header-new-subtitle" pullRight>
-                {newAvailableLangs.map(lang => (
-                    <MenuItem key={lang} eventKey={lang} onSelect={onTryAnotherSub}>{availableLangs[lang]}</MenuItem>
-                ))}
-            </DropdownButton>
+            <NewSubtitleButton newAvailableLangs={newAvailableLangs} onTryAnotherSub={onTryAnotherSub} />
         </h4>
 };
 
 const toWords = camelCase => `${camelCase[0].toUpperCase()}${camelCase.slice(1).replace(/([A-Z])/g, ' $1').toLowerCase()}`;
 const toValue = value => typeof value === 'string' ? value : JSON.stringify(value);
-const formatAddedOnDate = date => new Date(date).toLocaleString("en-EN", {
-    month: 'short',
-    year: 'numeric',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: 'numeric',
-    second: 'numeric',
-    hour12: false
-});
+
+const mapStateToProps = state => {
+    const mediaId = state.mediaLibrary.mediaInfo.id;
+    return {
+        mediaId,
+        subLangs: state.mediaLibrary.mediaListing[mediaId].subLangs
+    }
+};
+
+const mapDispatchToProps = dispatch => {
+    return {
+        onTryAnotherSub: (mediaId, lang) => { dispatch(tryAnotherSub(mediaId, lang)) },
+        onResetTestedSub: (mediaId, lang) => { dispatch(resetTestedSub(mediaId, lang)) }
+    }
+}
+
+export default connect(mapStateToProps, mapDispatchToProps)(ContentHeader);

@@ -1,6 +1,3 @@
-import MediaType from './MediaType';
-import Immutable from 'seamless-immutable'
-
 const inMemoryCache = {};
 
 const fetchThrow = async (url) => {
@@ -17,34 +14,32 @@ class FetchError extends Error {
 }
 
 const mediaListing = async () => {
-    const response = await fetchThrow('/listing');
-    return transformMediaListing(await response.json());
+    const mediaListing = await (await fetchThrow('/listing')).json();
+    addChildrenFields(mediaListing);
+    return mediaListing;
 };
 
-const transformMediaListing = (original) => {
-    const newListing = { [MediaType.MOVIE]: [], [MediaType.TV]: [] };
-    Object.entries(original).forEach(e => {
+const addChildrenFields = (mediaListing) => {
+    Object.entries(mediaListing).forEach(e => {
         e[1].id = e[0];
-        getContainer(original, newListing, e[1]).push(e[1]);
+        addToParent(mediaListing, e[1]);
     });
-
-    return Immutable(newListing);
 }
 
-const getContainer = (original, newListing, entry) => {
-    if (entry.type === MediaType.EPISODE || entry.type === MediaType.SEASON) {
-        const parent = original[entry.parentId];
-        if (!parent.children) parent.children = [];
-        return parent.children;
-    }
-    return newListing[entry.type];
+const addToParent = (mediaListing, entry) => {
+    if (!entry.parentId) return;
+    const parent = mediaListing[entry.parentId];
+    if (!parent.children) parent.children = [];
+    parent.children.push(entry.id);
 }
 
 const mediaInfo = async (id, forceUpdate) => {
     return cacheInMemory(
         'mediaInfo',
         id,
-        async () => (await fetchThrow(`/info/${id}`)).json(),
+        () => fetchThrow(`/info/${id}`)
+            .then(r => r.json())
+            .then(o => Object.assign(o, { id })),
         forceUpdate);
 };
 
